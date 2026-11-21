@@ -5,7 +5,7 @@ import { and, eq, gte } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { assertTripMember } from "@/lib/access";
 import { db } from "@/lib/db";
-import { activities, auditEvents, expenses, invitations, itineraryDays, mutations, participants, trips } from "@/lib/db/schema";
+import { activities, auditEvents, expenses, invitations, itineraryDays, mutations, participants, trips, users } from "@/lib/db/schema";
 import { invalidateTripCache } from "@/lib/cache";
 import { buildMapsUrl } from "@/lib/maps";
 
@@ -38,6 +38,16 @@ async function ensureNoOverlap(tx: Tx, tripId: string, dayId: string, startTime?
 async function audit(tx: Tx, tripId: string, actorId: string, action: string, entityId: string, details: unknown) {
   await tx.insert(auditEvents).values({ tripId, actorId, action, entityType: "itinerary", entityId, details: JSON.stringify(details) });
 }
+async function participantRows(tx: Tx, tripId: string, members: { name: string; email?: string }[], owner: { name: string; email: string; id: string }) {
+  const rows: { tripId: string; name: string; email?: string; userId: string | null; role: "owner" | "member" }[] = [{ tripId, name: owner.name, email: owner.email, userId: owner.id, role: "owner" }];
+  for (const item of members) {
+    const email = item.email?.trim().toLowerCase();
+    if (email && email === owner.email.toLowerCase()) continue;
+    const linked = email ? await tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1) : [];
+    rows.push({ tripId, name: item.name.trim(), email, userId: linked[0]?.id ?? null, role: "member" as const });
+  }
+  return rows;
+}
 
 export async function createTrip(input: { name: string; startDate: string; endDate: string; timezone: string; currency?: string; members?: { name: string; email?: string }[] }) {
   const user = await actor(); if (!db) throw new Error("Database is not configured");
@@ -45,7 +55,7 @@ export async function createTrip(input: { name: string; startDate: string; endDa
   const result = await db.transaction(async (tx) => {
     const [trip] = await tx.insert(trips).values({ name: input.name.trim(), startDate: input.startDate, endDate: input.endDate, timezone: input.timezone, currency: input.currency || "INR", createdBy: user.id }).returning();
     const days = await tx.insert(itineraryDays).values(datesBetween(input.startDate, input.endDate).map((date, index) => ({ tripId: trip.id, dayNumber: index + 1, date }))).returning();
-    const members = [{ tripId: trip.id, name: user.name, email: user.email, userId: user.id, role: "owner" as const }, ...(input.members || []).map((item) => ({ tripId: trip.id, name: item.name, email: item.email, userId: null, role: "member" as const }))];
+    const members = await participantRows(tx, trip.id, input.members || [], user);
     await tx.insert(participants).values(members);
     await audit(tx, trip.id, user.id, "created", trip.id, { days: days.length, members: members.length });
     return trip;
@@ -87,7 +97,7 @@ export async function importTrip(input: { idempotencyKey: string; trip: { name: 
   const result = await db.transaction(async (tx) => {
     const [trip] = await tx.insert(trips).values({ name: input.trip.name, startDate: input.trip.startDate, endDate: input.trip.endDate, timezone: input.trip.timezone, currency: input.trip.currency || "INR", createdBy: user.id }).returning();
     const days = await tx.insert(itineraryDays).values(datesBetween(input.trip.startDate, input.trip.endDate).map((date, index) => ({ tripId: trip.id, dayNumber: index + 1, date }))).returning();
-    await tx.insert(participants).values([{ tripId: trip.id, name: user.name, email: user.email, userId: user.id, role: "owner" as const }, ...input.members.filter((item) => item.email !== user.email).map((item) => ({ tripId: trip.id, name: item.name, email: item.email, userId: null, role: "member" as const }))]);
+    await tx.insert(participants).values(await participantRows(tx, trip.id, input.members, user));
     for (const [index, item] of input.activities.entries()) {
       const day = days.find((candidate) => candidate.date === item.date) || days[0];
       if (!day) throw new Error("Trip must contain at least one day");

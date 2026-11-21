@@ -16,7 +16,7 @@ export function parseTripCsv(csv: string): ImportPreview {
   const issues: CsvIssue[] = parsed.errors.map((error) => ({ row: (error.row ?? 0) + 2, column: "file", severity: "error", message: error.message }));
   const unknownColumns = (parsed.meta.fields ?? []).filter((field) => !schema.includes(field));
   unknownColumns.forEach((column) => issues.push({ row: 1, column, severity: "warning", message: "Unknown column will be ignored." }));
-  const rows = parsed.data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, value?.trim() ?? ""])));
+  const rows = parsed.data.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value == null ? "" : String(value)])));
   const tripRows = rows.filter((r) => r.record_type === "TRIP");
   if (tripRows.length !== 1) issues.push({ row: 1, column: "record_type", severity: "error", message: "CSV must contain exactly one TRIP row." });
   const trip = tripRows[0];

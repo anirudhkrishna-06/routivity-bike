@@ -4,6 +4,8 @@ import "../components/app-shell.css";
 import "../components/itinerary-workspace.css";
 import "./phase2-overrides.css";
 import "./auth.css";
+import "./real-dashboard.css";
+import "./import-trip.css";
 import { OfflineBanner } from "../components/offline-banner";
 
 export const metadata: Metadata = {

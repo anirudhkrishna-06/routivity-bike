@@ -8,7 +8,7 @@ import { flushPendingMutations } from "@/lib/queue-sync";
 
 type Activity = CsvRow & { localId: string };
 
-export function ItineraryWorkspace() {
+export function ItineraryWorkspace({ tripId }: { tripId: string }) {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [selectedDay, setSelectedDay] = useState(1);
@@ -37,7 +37,7 @@ export function ItineraryWorkspace() {
     setSelectedDay(Number(next[0]?.day_number) || 1);
     setMessage(`${next.length} activities ready. Changes save locally first.`);
     const payload = { idempotencyKey: crypto.randomUUID(), trip: { name: preview.trip?.trip_name || "Untitled trip", startDate: preview.trip?.start_date || next[0]?.date || new Date().toISOString().slice(0, 10), endDate: preview.trip?.end_date || next.at(-1)?.date || new Date().toISOString().slice(0, 10), timezone: preview.trip?.timezone || "Asia/Kolkata", currency: preview.trip?.currency || "INR" }, members: preview.members.map((member) => ({ name: member.member_name, email: member.member_email })), activities: next.map((activity) => ({ type: activity.activity_type as "TRAVEL" | "STAY" | "EXPLORATION" | "CUSTOM", title: activity.title, date: activity.date, startTime: activity.start_time, endTime: activity.end_time, origin: activity.origin, destination: activity.destination, location: activity.location, viaPoints: activity.via_points, mapsUrl: activity.maps_url, status: (activity.status || "planned") as "planned" | "done" | "skipped" })) };
-    void queueMutation({ id: payload.idempotencyKey, tripId: "pending-trip", type: "import-itinerary", payload, createdAt: Date.now() });
+    void queueMutation({ id: payload.idempotencyKey, tripId, type: "import-itinerary", payload, createdAt: Date.now() });
     void flushPendingMutations();
   }
 

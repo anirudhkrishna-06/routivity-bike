@@ -1,9 +1,10 @@
 record_type,trip_name,start_date,end_date,creator_name,currency,timezone,member_id,member_name,member_email,day_number,date,activity_type,title,start_time,end_time,origin,destination,location,via_points,maps_url,bike_id,status,notes
-TRIP,Hampi loop,2025-06-14,2025-06-18,Arjun Kumar,INR,Asia/Kolkata,,,,,,,,,,,,,,,,
-MEMBER,,,,,,,arjun,Arjun Kumar,arjun@example.com,,,,,,,,,,,,,,,,
-MEMBER,,,,,,,rohan,Rohan Shah,rohan@example.com,,,,,,,,,,,,,,,,
-MEMBER,,,,,,,meera,Meera Nair,meera@example.com,,,,,,,,,,,,,,,,
-ACTIVITY,,,,,,,,,,,1,2025-06-14,TRAVEL,Bengaluru to Hampi,05:30,13:00,Bengaluru,Hampi,,Bellary|Hospet,,bike-1,planned,Start early before the heat
-ACTIVITY,,,,,,,,,,,1,2025-06-14,EXPLORATION,Vijaya Vittala Temple,15:00,17:30,,,Vijaya Vittala Temple,,,planned,
-ACTIVITY,,,,,,,,,,,2,2025-06-15,EXPLORATION,Sunrise at Matanga Hill,05:30,07:30,,,Matanga Hill,,,planned,
-ACTIVITY,,,,,,,,,,,2,2025-06-15,STAY,Riverstone guesthouse,18:00,19:00,,,Hampi,,,planned,
+TRIP,Hampi loop,2025-06-14,2025-06-18,Arjun Kumar,INR,Asia/Kolkata,,,,,,,,,,,,,,,,,
+MEMBER,,,,,,,arjun,Arjun Kumar,arjun@example.com,,,,,,,,,,,,,,
+MEMBER,,,,,,,rohan,Rohan Shah,rohan@example.com,,,,,,,,,,,,,,
+MEMBER,,,,,,,meera,Meera Nair,meera@example.com,,,,,,,,,,,,,,
+ACTIVITY,,,,,,,,,,1,2025-06-14,TRAVEL,Bengaluru to Hampi,05:30,13:00,Bengaluru,Hampi,,Bellary|Hospet,,bike-1,planned,Start early before the heat
+ACTIVITY,,,,,,,,,,1,2025-06-14,EXPLORATION,Vijaya Vittala Temple,15:00,17:30,,,Vijaya Vittala Temple,,,,planned,
+ACTIVITY,,,,,,,,,,2,2025-06-15,EXPLORATION,Sunrise at Matanga Hill,05:30,07:30,,,Matanga Hill,,,,planned,
+ACTIVITY,,,,,,,,,,2,2025-06-15,STAY,Riverstone guesthouse,18:00,19:00,,,Hampi,,,,planned,
+
