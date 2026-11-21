@@ -6,6 +6,15 @@ import "./phase2-overrides.css";
 import "./auth.css";
 import "./real-dashboard.css";
 import "./import-trip.css";
+import "../components/money-workspace.css";
+import "../components/settlement-workspace.css";
+import "./budget.css";
+import "./danger.css";
+import "./trip-settings.css";
+import "./dashboard.css";
+import "./money-actions.css";
+import "./fuel-fields.css";
+import "./payer-fields.css";
 import { OfflineBanner } from "../components/offline-banner";
 
 export const metadata: Metadata = {

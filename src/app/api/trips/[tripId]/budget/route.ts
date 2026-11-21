@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { getMoneyOverview, saveBudgetRule } from "@/app/actions/money";
+export async function GET(_: Request, { params }: { params: Promise<{ tripId: string }> }) { try { const { tripId } = await params; const data = await getMoneyOverview(tripId); return NextResponse.json({ budgets: data.budgets }); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load budgets." }, { status: 400 }); } }
+export async function POST(request: Request, { params }: { params: Promise<{ tripId: string }> }) { try { const { tripId } = await params; return NextResponse.json(await saveBudgetRule({ ...(await request.json()), tripId })); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to save budget." }, { status: 400 }); } }

@@ -1,9 +1,11 @@
-import { integer, pgEnum, pgTable, text, timestamp, uuid, varchar, boolean, date, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, uuid, varchar, boolean, date, uniqueIndex, index, jsonb } from "drizzle-orm/pg-core";
 
 export const memberStatus = pgEnum("member_status", ["active", "inactive"]);
 export const memberRole = pgEnum("member_role", ["owner", "member"]);
 export const activityStatus = pgEnum("activity_status", ["planned", "done", "skipped"]);
 export const activityType = pgEnum("activity_type", ["TRAVEL", "STAY", "EXPLORATION", "CUSTOM"]);
+export const settlementTransferStatus = pgEnum("settlement_transfer_status", ["pending", "confirmed", "reversed"]);
+export const settlementRoundStatus = pgEnum("settlement_round_status", ["open", "closed", "reversed"]);
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -84,6 +86,7 @@ export const activities = pgTable("activities", {
   location: text("location"),
   mapsUrl: text("maps_url"),
   viaPoints: text("via_points"),
+  distanceKmMilli: integer("distance_km_milli"),
   bikeId: uuid("bike_id"),
   status: activityStatus("status").default("planned").notNull(),
   movable: boolean("movable").default(true).notNull(),
@@ -98,6 +101,8 @@ export const bikes = pgTable("bikes", {
   tripId: uuid("trip_id").references(() => trips.id).notNull(),
   name: varchar("name", { length: 120 }).notNull(),
   model: varchar("model", { length: 120 }),
+  mileageKmplMilli: integer("mileage_kmpl_milli"),
+  fuelPricePaisePerLitre: integer("fuel_price_paise_per_litre"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -105,8 +110,88 @@ export const expenses = pgTable("expenses", {
   id: uuid("id").defaultRandom().primaryKey(),
   tripId: uuid("trip_id").references(() => trips.id).notNull(),
   activityId: uuid("activity_id").references(() => activities.id),
-  description: varchar("description", { length: 180 }).notNull(),
+  description: varchar("description", { length: 180 }),
+  category: varchar("category", { length: 60 }).default("MISCELLANEOUS").notNull(),
+  expenseDate: date("expense_date").notNull(),
+  enteredBy: uuid("entered_by").references(() => users.id).notNull(),
   amountPaise: integer("amount_paise").notNull(),
+  litres: integer("litres_milli"),
+  odometerKm: integer("odometer_km_milli"),
+  reversedAt: timestamp("reversed_at", { withTimezone: true }),
+  reversalReason: text("reversal_reason"),
+  version: integer("version").default(1).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const expensePayments = pgTable("expense_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  expenseId: uuid("expense_id").references(() => expenses.id).notNull(),
+  participantId: uuid("participant_id").references(() => participants.id).notNull(),
+  amountPaise: integer("amount_paise").notNull(),
+});
+
+export const expenseShares = pgTable("expense_shares", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  expenseId: uuid("expense_id").references(() => expenses.id).notNull(),
+  participantId: uuid("participant_id").references(() => participants.id).notNull(),
+  amountPaise: integer("amount_paise").notNull(),
+});
+
+export const expenseRevisions = pgTable("expense_revisions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  expenseId: uuid("expense_id").references(() => expenses.id).notNull(),
+  actorId: uuid("actor_id").references(() => users.id).notNull(),
+  version: integer("version").notNull(),
+  before: jsonb("before").notNull(),
+  after: jsonb("after").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const budgetRules = pgTable("budget_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  category: varchar("category", { length: 60 }).notNull(),
+  ruleType: varchar("rule_type", { length: 30 }).notNull(),
+  amountPaise: integer("amount_paise").notNull(),
+  scope: varchar("scope", { length: 30 }).default("TRIP").notNull(),
+  effectiveFrom: date("effective_from").notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdBy: uuid("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const budgetRuleHistory = pgTable("budget_rule_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  budgetRuleId: uuid("budget_rule_id").references(() => budgetRules.id).notNull(),
+  actorId: uuid("actor_id").references(() => users.id).notNull(),
+  oldAmountPaise: integer("old_amount_paise").notNull(),
+  newAmountPaise: integer("new_amount_paise").notNull(),
+  effectiveFrom: date("effective_from").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const settlementRounds = pgTable("settlement_rounds", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  snapshot: jsonb("snapshot").notNull(),
+  status: settlementRoundStatus("status").default("open").notNull(),
+  startedBy: uuid("started_by").references(() => users.id).notNull(),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const settlementTransfers = pgTable("settlement_transfers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roundId: uuid("round_id").references(() => settlementRounds.id).notNull(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  senderId: uuid("sender_id").references(() => participants.id).notNull(),
+  receiverId: uuid("receiver_id").references(() => participants.id).notNull(),
+  amountPaise: integer("amount_paise").notNull(),
+  status: settlementTransferStatus("status").default("pending").notNull(),
+  recordedBy: uuid("recorded_by").references(() => users.id).notNull(),
+  confirmedBy: uuid("confirmed_by").references(() => users.id),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  reversalReason: text("reversal_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

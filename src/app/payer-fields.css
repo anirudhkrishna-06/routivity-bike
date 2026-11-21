@@ -1,0 +1,1 @@
+.payer-heading{display:flex;justify-content:space-between;align-items:end;margin-top:15px}.payer-row{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:7px}.payer-row select,.payer-row input{border:1px solid #dfe5dc;border-radius:9px;padding:9px;font-size:11px}.remove-payer{border:0;background:#fae2dc;color:#983d26;border-radius:8px;width:30px}

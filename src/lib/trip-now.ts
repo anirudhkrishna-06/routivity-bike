@@ -1,0 +1,22 @@
+export type NowActivity = { id: string; date: string; dayNumber: number; type: string; title: string; startTime?: string | null; endTime?: string | null; origin?: string | null; destination?: string | null; location?: string | null; mapsUrl?: string | null; distanceKmMilli?: number | null; status: string };
+export type TripNowState = { kind: "before" | "day-before" | "morning" | "travelling" | "exploring" | "free" | "stay" | "wrap-up" | "rest" | "after"; label: string; title: string; description: string; activity?: NowActivity; nextActivity?: NowActivity; minutesRemaining?: number; date: string };
+
+function minutes(value?: string | null) { if (!value) return undefined; const [hours, mins] = value.split(":").map(Number); return Number.isFinite(hours) && Number.isFinite(mins) ? hours * 60 + mins : undefined; }
+function tripLocalParts(now: Date, timezone: string) { const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now); const get = (type: string) => parts.find((part) => part.type === type)?.value || "00"; return { date: `${get("year")}-${get("month")}-${get("day")}`, minute: Number(get("hour")) * 60 + Number(get("minute")) }; }
+
+export function getTripLocalParts(now: Date, timezone: string) { return tripLocalParts(now, timezone); }
+
+export function getTripNow(input: { startDate: string; endDate: string; timezone: string; activities: NowActivity[]; now?: Date; preview?: { date: string; time: string } }): TripNowState {
+  const local = input.preview ? { date: input.preview.date, minute: minutes(input.preview.time) || 0 } : tripLocalParts(input.now || new Date(), input.timezone);
+  if (local.date < input.startDate) return { kind: local.date === addDays(input.startDate, -1) ? "day-before" : "before", label: local.date === addDays(input.startDate, -1) ? "THE DAY BEFORE" : "BEFORE THE TRIP", title: local.date === addDays(input.startDate, -1) ? "Tomorrow, the journey begins." : "Your trip is coming up.", description: "Check the itinerary, bikes, and budget before you leave.", date: local.date };
+  if (local.date > input.endDate) return { kind: "after", label: "AFTER THE TRIP", title: "The route is complete.", description: "Review your spending and settle any remaining balances.", date: local.date };
+  const dayActivities = input.activities.filter((activity) => activity.date === local.date).sort((a, b) => (minutes(a.startTime) ?? 0) - (minutes(b.startTime) ?? 0));
+  if (!dayActivities.length) return { kind: "rest", label: "REST DAY", title: "A slower day by design.", description: "There are no planned activities today.", date: local.date };
+  const current = dayActivities.find((activity) => { const start = minutes(activity.startTime); const end = minutes(activity.endTime); return start !== undefined && end !== undefined && local.minute >= start && local.minute < end; });
+  if (current) { const end = minutes(current.endTime) || local.minute; const kind = current.type === "TRAVEL" ? "travelling" : current.type === "STAY" ? "stay" : "exploring"; return { kind, label: kind === "travelling" ? "TRAVELLING" : kind === "stay" ? "AT THE STAY" : "EXPLORING", title: current.title, description: current.type === "TRAVEL" ? `${current.origin || "Origin"} to ${current.destination || "destination"}` : current.location || "This activity is happening now.", activity: current, minutesRemaining: Math.max(0, end - local.minute), nextActivity: dayActivities.find((item) => (minutes(item.startTime) || 0) > end), date: local.date }; }
+  const next = dayActivities.find((activity) => (minutes(activity.startTime) ?? 0) > local.minute);
+  if (next) { const firstStart = minutes(dayActivities[0].startTime) ?? 0; if (local.minute < firstStart) return { kind: "morning", label: "GOOD MORNING", title: "The day is ready when you are.", description: `First up: ${next.title}.`, nextActivity: next, date: local.date }; return { kind: "free", label: "FREE TIME", title: "A little room in the plan.", description: `Next: ${next.title}.`, nextActivity: next, date: local.date }; }
+  return { kind: "wrap-up", label: "DAY WRAP-UP", title: "That’s the day.", description: "Review what happened and prepare for tomorrow.", activity: dayActivities[dayActivities.length - 1], date: local.date };
+}
+
+function addDays(value: string, amount: number) { const date = new Date(`${value}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + amount); return date.toISOString().slice(0, 10); }

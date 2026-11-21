@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createActivity, deleteActivity, duplicateActivity, importTrip, moveActivity, updateActivity } from "@/app/actions/trips";
+import { createExpense, editExpense, reverseExpense } from "@/app/actions/money";
 
 export async function POST(request: Request) {
   try {
@@ -10,6 +11,9 @@ export async function POST(request: Request) {
     if (body.type === "delete-activity") return NextResponse.json(await deleteActivity(body.payload as Parameters<typeof deleteActivity>[0]));
     if (body.type === "duplicate-activity") return NextResponse.json(await duplicateActivity(body.payload as Parameters<typeof duplicateActivity>[0]));
     if (body.type === "move-activity") return NextResponse.json(await moveActivity(body.payload as Parameters<typeof moveActivity>[0]));
+    if (body.type === "create-expense") return NextResponse.json(await createExpense(body.payload as Parameters<typeof createExpense>[0]));
+    if (body.type === "edit-expense") return NextResponse.json(await editExpense(body.payload as Parameters<typeof editExpense>[0]));
+    if (body.type === "reverse-expense") return NextResponse.json(await reverseExpense(body.payload as Parameters<typeof reverseExpense>[0]));
     return NextResponse.json({ error: "Unknown mutation type." }, { status: 400 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Sync failed." }, { status: 400 });

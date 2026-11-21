@@ -1,15 +1,16 @@
 "use server";
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { assertTripMember } from "@/lib/access";
 import { db } from "@/lib/db";
-import { activities, auditEvents, expenses, invitations, itineraryDays, mutations, participants, trips, users } from "@/lib/db/schema";
+import { activities, auditEvents, budgetRuleHistory, budgetRules, expensePayments, expenseRevisions, expenseShares, expenses, invitations, itineraryDays, mutations, participants, settlementRounds, settlementTransfers, trips, users, bikes } from "@/lib/db/schema";
 import { invalidateTripCache } from "@/lib/cache";
 import { buildMapsUrl } from "@/lib/maps";
 
-type ActivityInput = { type: "TRAVEL" | "STAY" | "EXPLORATION" | "CUSTOM"; title: string; date: string; startTime?: string; endTime?: string; origin?: string; destination?: string; location?: string; viaPoints?: string; mapsUrl?: string; status?: "planned" | "done" | "skipped"; movable?: boolean };
+type ActivityInput = { type: "TRAVEL" | "STAY" | "EXPLORATION" | "CUSTOM"; title: string; date: string; startTime?: string; endTime?: string; origin?: string; destination?: string; location?: string; viaPoints?: string; mapsUrl?: string; distanceKmMilli?: number; bikeId?: string; status?: "planned" | "done" | "skipped"; movable?: boolean };
+type BudgetInput = { category: string; ruleType: "PER_DAY" | "PER_NIGHT" | "TOTAL" | "DERIVED"; amountPaise: number; effectiveFrom?: string };
 type Db = NonNullable<typeof db>;
 type Tx = Pick<Db, "select" | "insert" | "update">;
 
@@ -38,14 +39,18 @@ async function ensureNoOverlap(tx: Tx, tripId: string, dayId: string, startTime?
 async function audit(tx: Tx, tripId: string, actorId: string, action: string, entityId: string, details: unknown) {
   await tx.insert(auditEvents).values({ tripId, actorId, action, entityType: "itinerary", entityId, details: JSON.stringify(details) });
 }
-async function participantRows(tx: Tx, tripId: string, members: { name: string; email?: string }[], owner: { name: string; email: string; id: string }) {
-  const rows: { tripId: string; name: string; email?: string; userId: string | null; role: "owner" | "member" }[] = [{ tripId, name: owner.name, email: owner.email, userId: owner.id, role: "owner" }];
+async function participantRows(tx: Tx, tripId: string, members: { name: string; email?: string }[], owner: { name: string; email: string; id: string }, ownerMemberName?: string) {
+  const selectedName = ownerMemberName?.trim().toLowerCase();
+  const selectedIndex = members.findIndex((item) => selectedName && item.name.trim().toLowerCase() === selectedName);
+  const ownerInMembers = selectedIndex >= 0 || members.some((item) => item.email?.trim().toLowerCase() === owner.email.toLowerCase());
+  const rows: { tripId: string; name: string; email?: string; userId: string | null; role: "owner" | "member" }[] = [];
   for (const item of members) {
     const email = item.email?.trim().toLowerCase();
-    if (email && email === owner.email.toLowerCase()) continue;
+    const isOwnerMember = (selectedName && item.name.trim().toLowerCase() === selectedName) || (email && email === owner.email.toLowerCase()) || (!ownerMemberName && item.name.trim().toLowerCase() === owner.name.trim().toLowerCase());
     const linked = email ? await tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1) : [];
-    rows.push({ tripId, name: item.name.trim(), email, userId: linked[0]?.id ?? null, role: "member" as const });
+    rows.push({ tripId, name: item.name.trim(), email, userId: isOwnerMember ? owner.id : linked[0]?.id ?? null, role: isOwnerMember ? "owner" : "member" });
   }
+  if (!ownerInMembers) rows.unshift({ tripId, name: owner.name, email: owner.email, userId: owner.id, role: "owner" });
   return rows;
 }
 
@@ -78,6 +83,27 @@ export async function listTripMembers(tripId: string) {
   return db.query.participants.findMany({ where: eq(participants.tripId, tripId) });
 }
 
+export async function listTripActivities(tripId: string) {
+  await member(tripId); if (!db) throw new Error("Database is not configured");
+  return db.select({
+    id: activities.id,
+    dayNumber: itineraryDays.dayNumber,
+    date: itineraryDays.date,
+    type: activities.type,
+    title: activities.title,
+    startTime: activities.startTime,
+    endTime: activities.endTime,
+    origin: activities.origin,
+    destination: activities.destination,
+    location: activities.location,
+    mapsUrl: activities.mapsUrl,
+    distanceKmMilli: activities.distanceKmMilli,
+    bikeId: activities.bikeId,
+    status: activities.status,
+    sortOrder: activities.sortOrder,
+  }).from(activities).innerJoin(itineraryDays, eq(activities.dayId, itineraryDays.id)).where(and(eq(activities.tripId, tripId), eq(activities.archived, false))).orderBy(asc(activities.sortOrder));
+}
+
 export async function acceptInvite(rawToken: string) {
   const user = await actor(); if (!db) throw new Error("Database is not configured");
   const invitation = await db.query.invitations.findFirst({ where: and(eq(invitations.tokenHash, tokenHash(rawToken)), gte(invitations.expiresAt, new Date())) });
@@ -90,22 +116,23 @@ export async function acceptInvite(rawToken: string) {
   return { tripId: invitation.tripId };
 }
 
-export async function importTrip(input: { idempotencyKey: string; trip: { name: string; startDate: string; endDate: string; timezone: string; currency?: string }; members: { name: string; email?: string }[]; activities: ActivityInput[] }) {
+export async function importTrip(input: { idempotencyKey: string; trip: { name: string; startDate: string; endDate: string; timezone: string; currency?: string }; members: { name: string; email?: string }[]; authMemberName?: string; activities: ActivityInput[]; budgets?: BudgetInput[] }) {
   const user = await actor(); if (!db) throw new Error("Database is not configured");
   const existing = await db.query.mutations.findFirst({ where: eq(mutations.idempotencyKey, input.idempotencyKey) });
   if (existing) return JSON.parse(existing.result) as { tripId: string };
   const result = await db.transaction(async (tx) => {
     const [trip] = await tx.insert(trips).values({ name: input.trip.name, startDate: input.trip.startDate, endDate: input.trip.endDate, timezone: input.trip.timezone, currency: input.trip.currency || "INR", createdBy: user.id }).returning();
     const days = await tx.insert(itineraryDays).values(datesBetween(input.trip.startDate, input.trip.endDate).map((date, index) => ({ tripId: trip.id, dayNumber: index + 1, date }))).returning();
-    await tx.insert(participants).values(await participantRows(tx, trip.id, input.members, user));
+    await tx.insert(participants).values(await participantRows(tx, trip.id, input.members, user, input.authMemberName));
+    if (input.budgets?.length) await tx.insert(budgetRules).values(input.budgets.map((rule) => ({ tripId: trip.id, category: rule.category, ruleType: rule.ruleType, amountPaise: rule.amountPaise, effectiveFrom: rule.effectiveFrom || trip.startDate, createdBy: user.id })));
     for (const [index, item] of input.activities.entries()) {
       const day = days.find((candidate) => candidate.date === item.date) || days[0];
       if (!day) throw new Error("Trip must contain at least one day");
       await ensureNoOverlap(tx, trip.id, day.id, item.startTime, item.endTime);
-      await tx.insert(activities).values({ tripId: trip.id, dayId: day.id, type: item.type, title: item.title, startTime: item.startTime, endTime: item.endTime, origin: item.origin, destination: item.destination, location: item.location, viaPoints: item.viaPoints, mapsUrl: buildMapsUrl(item), status: item.status || "planned", movable: item.movable ?? true, sortOrder: index });
+      await tx.insert(activities).values({ tripId: trip.id, dayId: day.id, type: item.type, title: item.title, startTime: item.startTime, endTime: item.endTime, origin: item.origin, destination: item.destination, location: item.location, viaPoints: item.viaPoints, mapsUrl: buildMapsUrl(item), distanceKmMilli: item.distanceKmMilli, bikeId: item.bikeId, status: item.status || "planned", movable: item.movable ?? true, sortOrder: index });
     }
     const payload = { tripId: trip.id };
-    await audit(tx, trip.id, user.id, "imported", trip.id, { activities: input.activities.length });
+    await audit(tx, trip.id, user.id, "imported", trip.id, { activities: input.activities.length, budgets: input.budgets?.length || 0 });
     await tx.insert(mutations).values({ idempotencyKey: input.idempotencyKey, tripId: trip.id, actorId: user.id, result: JSON.stringify(payload) });
     return payload;
   });
@@ -174,4 +201,31 @@ export async function moveActivity(input: { tripId: string; activityId: string; 
 export async function listActivityLog(tripId: string) {
   await member(tripId); if (!db) throw new Error("Database is not configured");
   return db.query.auditEvents.findMany({ where: eq(auditEvents.tripId, tripId), orderBy: (events, { desc }) => [desc(events.createdAt)], limit: 100 });
+}
+
+export async function deleteTrip(tripId: string, reason: string) {
+  const { user } = await member(tripId, true);
+  if (!reason.trim()) throw new Error("A deletion reason is required");
+  await db!.transaction(async (tx) => {
+    const expenseIds = (await tx.select({ id: expenses.id }).from(expenses).where(eq(expenses.tripId, tripId))).map((row) => row.id);
+    const ruleIds = (await tx.select({ id: budgetRules.id }).from(budgetRules).where(eq(budgetRules.tripId, tripId))).map((row) => row.id);
+    const roundIds = (await tx.select({ id: settlementRounds.id }).from(settlementRounds).where(eq(settlementRounds.tripId, tripId))).map((row) => row.id);
+    if (expenseIds.length) { await tx.delete(expensePayments).where(inArray(expensePayments.expenseId, expenseIds)); await tx.delete(expenseShares).where(inArray(expenseShares.expenseId, expenseIds)); await tx.delete(expenseRevisions).where(inArray(expenseRevisions.expenseId, expenseIds)); }
+    if (ruleIds.length) await tx.delete(budgetRuleHistory).where(inArray(budgetRuleHistory.budgetRuleId, ruleIds));
+    if (roundIds.length) await tx.delete(settlementTransfers).where(inArray(settlementTransfers.roundId, roundIds));
+    await tx.delete(settlementTransfers).where(eq(settlementTransfers.tripId, tripId));
+    await tx.delete(settlementRounds).where(eq(settlementRounds.tripId, tripId));
+    await tx.delete(budgetRules).where(eq(budgetRules.tripId, tripId));
+    await tx.delete(expenses).where(eq(expenses.tripId, tripId));
+    await tx.delete(mutations).where(eq(mutations.tripId, tripId));
+    await tx.delete(auditEvents).where(eq(auditEvents.tripId, tripId));
+    await tx.delete(invitations).where(eq(invitations.tripId, tripId));
+    await tx.delete(activities).where(eq(activities.tripId, tripId));
+    await tx.delete(bikes).where(eq(bikes.tripId, tripId));
+    await tx.delete(itineraryDays).where(eq(itineraryDays.tripId, tripId));
+    await tx.delete(participants).where(eq(participants.tripId, tripId));
+    await tx.delete(trips).where(eq(trips.id, tripId));
+  });
+  await invalidateTripCache(tripId);
+  return { tripId, deletedBy: user.id };
 }

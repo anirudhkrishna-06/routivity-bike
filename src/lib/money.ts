@@ -18,6 +18,17 @@ export function splitEqual(total: Paise, memberIds: readonly string[]): Record<s
   return Object.fromEntries(ordered.map((id, index) => [id, (base + (index < remainder ? 1 : 0)) as Paise]));
 }
 
+/** Split using integer basis points (10000 = 100%). */
+export function splitPercentBasisPoints(total: Paise, percentages: Record<string, number>): Record<string, Paise> {
+  const entries = Object.entries(percentages).sort(([a], [b]) => a.localeCompare(b));
+  if (!entries.length || entries.some(([, basisPoints]) => !Number.isInteger(basisPoints) || basisPoints < 0) || entries.reduce((sum, [, basisPoints]) => sum + basisPoints, 0) !== 10000) throw new Error("Percentages must be non-negative integers that sum to 10000 basis points");
+  const exact = entries.map(([id, basisPoints]) => ({ id, floor: Math.floor(total * basisPoints / 10000), remainder: (total * basisPoints) % 10000 }));
+  let remaining = total - exact.reduce((sum, item) => sum + item.floor, 0);
+  exact.sort((a, b) => b.remainder - a.remainder || a.id.localeCompare(b.id));
+  for (const item of exact) { if (remaining <= 0) break; item.floor += 1; remaining -= 1; }
+  return Object.fromEntries(exact.map((item) => [item.id, item.floor as Paise]));
+}
+
 export function sumPaise(values: readonly (Paise | number)[]): Paise {
   return values.reduce((total, value) => total + value, 0) as Paise;
 }
