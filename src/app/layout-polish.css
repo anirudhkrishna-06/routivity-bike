@@ -1,0 +1,80 @@
+/* Shared trip workspace spacing and navigation polish. */
+.budget-workspace,
+.analytics-workspace { padding-top: 10px; }
+
+.workspace-heading { margin-top: 5px; margin-bottom: 16px; }
+.settlement-workspace { padding-top: 10px; }
+
+.analytics-actions-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 22px 0 6px;
+}
+
+.analytics-action-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 54px;
+  border: 0;
+  border-radius: 16px;
+  background: #1b2520;
+  color: #eef4ee;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 8px 18px #19231d18;
+  transition: transform .2s ease, background .2s ease;
+}
+
+.analytics-action-card:hover { transform: translateY(-2px); background: #285f48; }
+.app.dark .analytics-action-card { background: #eef4ee; color: #19231d; box-shadow: 0 8px 18px #00000025; }
+.app.dark .analytics-action-card:hover { background: #d6e6d9; }
+
+.topbar { gap: 5px; }
+.brand-home img { width: 104px; height: auto; }
+
+.topbar-back {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #a43c2d;
+  color: #fff;
+}
+
+.topbar-back:hover { background: #863024; transform: translateX(-2px) scale(1.04); }
+.app.dark .topbar-back { background: #c55243; color: #fff; }
+.app.dark .topbar-back:hover { background: #dc6252; }
+
+.hub-action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 16px; }
+.hub-action-card { display: flex; align-items: center; gap: 11px; min-height: 52px; padding: 1px; border-radius: 7px; color: #fff; text-decoration: none; box-shadow: 0 10px 22px #19231d18; transition: transform .2s ease, box-shadow .2s ease, filter .2s ease; }
+.hub-action-card:hover { transform: translateY(-3px); box-shadow: 0 14px 26px #19231d25; filter: brightness(1.08); }
+.hub-action-card.add { background: #a43c2d; }
+.hub-action-card.join { background: #1b2520; }
+.hub-action-card span { display: grid; gap: 4px; }
+.hub-action-card b { font-size: 13px; }
+.hub-action-card small { color: #ffffffb8; font-size: 9px; }
+.trip-name-field { display: grid; gap: 7px; margin: 18px 0; color: #526157; font-size: 11px; font-weight: 700; }
+.trip-name-field input { border: 1px solid #dfe5dc; border-radius: 14px; background: #fff; padding: 12px 13px; font-size: 13px; outline-color: #285f48; }
+.trip-name-field small { color: #778178; font-size: 9px; font-weight: 400; }
+html[data-theme="dark"] .trip-name-field { color: #c3d1c6; }
+html[data-theme="dark"] .trip-name-field input { background: #111815; border-color: #304037; color: #eef4ee; }
+.join-role-label { color: #285f48 !important; font-size: 10px !important; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; margin: 14px 0 8px !important; }
+.join-candidate b { font-size: 11px; }
+.join-candidate.selected { transform: translateY(-1px); background: #e3f0e6; }
+html[data-theme="dark"] .join-candidate.selected { background: #254333; }
+.settings-page .members-card>p { font-size: 10px; line-height: 1.35; margin-bottom: 10px; }
+.settings-page .member-list { margin: 10px 0; }
+.settings-page .member-line { padding: 8px 0; }
+.settings-page .share-code-card { padding: 11px; margin-top: 10px; }
+.settings-page .share-code-card h2 { font-size: 17px; }
+.settings-page .share-code-card p { display: none; }
+@media (max-width: 460px) { .hub-action-card { min-height: 66px; padding: 12px; } .hub-action-card b { font-size: 11px; } .hub-action-card small { font-size: 8px; } }
+
+@media (max-width: 520px) {
+  .analytics-actions-bottom { margin-top: 18px; }
+  .analytics-action-card { min-height: 50px; }
+}

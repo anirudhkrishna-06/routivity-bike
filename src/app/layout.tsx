@@ -17,6 +17,7 @@ import "./fuel-fields.css";
 import "./payer-fields.css";
 import "./fuel-intelligence.css";
 import "./activity-editor.css";
+import "./layout-polish.css";
 import { OfflineBanner } from "../components/offline-banner";
 
 export const metadata: Metadata = {

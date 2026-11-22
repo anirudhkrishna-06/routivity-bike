@@ -1,8 +1,9 @@
 "use client";
 /* eslint-disable react-hooks/purity */
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { CircleAlert, Filter, Plus, WalletCards, X } from "lucide-react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { gsap } from "gsap";
+import { Check, ChevronDown, CircleAlert, Filter, Plus, WalletCards, X } from "lucide-react";
 import { rupeesToPaise, splitEqual, splitPercentBasisPoints } from "@/lib/money";
 import { flushPendingMutations } from "@/lib/queue-sync";
 import { queueMutation } from "@/lib/local-queue";
@@ -22,7 +23,7 @@ export function MoneyWorkspace({ tripId, openOnMount = false }: { tripId: string
   useEffect(() => { void load(); const onOnline = () => { void flushPendingMutations().then(load); }; const onRefresh = () => { void load(); }; window.addEventListener("online", onOnline); window.addEventListener("routivity-refresh", onRefresh); return () => { window.removeEventListener("online", onOnline); window.removeEventListener("routivity-refresh", onRefresh); }; }, [tripId]);
   const filtered = useMemo(() => data?.expenses.filter((expense) => filter === "ALL" || expense.category === filter) ?? [], [data, filter]);
   async function reverse(expense: Expense) { const reason = window.prompt("Why are you reversing this expense?"); if (!reason) return; const response = await fetch(`/api/trips/${tripId}/money`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "reverse", payload: { expenseId: expense.id, reason, idempotencyKey: crypto.randomUUID() } }) }); if (!response.ok) setError((await response.json() as { error?: string }).error || "Unable to reverse expense."); else void load(); }
-  return <section className="money-workspace"><div className="money-heading"><div><span className="section-label">EXPENSES</span><h2>Every paisa accounted for.</h2><p>Fast entry, shared balances, and a server-backed ledger.</p></div><button className="small-button primary-small" onClick={() => { setEditing(undefined); setError(""); setShowForm(true); }}><Plus size={15}/> Add expense</button></div>{error && <div className="money-error"><CircleAlert size={15}/>{error}</div>}<div className="balance-strip">{(data?.balances || []).map((person) => <div className="balance-chip" key={person.participantId}><span>{person.name}</span><b className={person.netPaise >= 0 ? "positive" : "negative"}>{money(Math.abs(person.netPaise))} {person.netPaise >= 0 ? "owed" : "owes"}</b></div>)}</div><div className="ledger-card"><div className="ledger-header"><div><span className="section-label">LEDGER</span><h3>{filtered.length ? `${filtered.length} recorded expenses` : "No expenses recorded yet"}</h3></div><label className="filter-control"><Filter size={14}/><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All categories</option>{categories.map((item) => <option key={item} value={item}>{categoryLabels[item]}</option>)}</select></label></div>{filtered.map((expense) => <div className={expense.reversedAt ? "ledger-row reversed" : "ledger-row"} key={expense.id}><div className="ledger-icon"><WalletCards size={16}/></div><div className="ledger-copy"><b>{expense.description || categoryLabels[expense.category] || expense.category}</b><small>{expense.expenseDate} · {categoryLabels[expense.category] || expense.category}</small></div><strong>{money(expense.amountPaise)}</strong>{expense.reversedAt ? <span className="reversed-label">reversed</span> : <div className="ledger-actions"><button onClick={() => { setEditing(expense); setShowForm(true); }}>Edit</button><button onClick={() => void reverse(expense)}>Reverse</button></div>}</div>)}{data && !filtered.length && <div className="ledger-empty">Add the first expense to start calculating balances.</div>}</div><BudgetPanel tripId={tripId} budgets={data?.budgetSummary || []} onSaved={() => void load()}/>{showForm && <ExpenseForm tripId={tripId} people={data?.balances || []} defaultPayerId={data?.currentUserId} today={data?.today} stayOptions={data?.stayOptions || []} initial={editing} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); setEditing(undefined); void load(); }}/>}</section>;
+  return <section className="money-workspace"><div className="money-heading"><div><h2>Every paisa accounted for.</h2><p>Fast entry, shared balances, and a server-backed ledger.</p></div></div><div className="ledger-card"><div className="ledger-header"><div><span className="section-label">LEDGER</span><h3>{filtered.length ? `${filtered.length} recorded expenses` : "No expenses recorded yet"}</h3></div><label className="filter-control"><Filter size={14}/><select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="ALL">All categories</option>{categories.map((item) => <option key={item} value={item}>{categoryLabels[item]}</option>)}</select></label></div>{filtered.map((expense) => <div className={expense.reversedAt ? "ledger-row reversed" : "ledger-row"} key={expense.id}><div className="ledger-icon"><WalletCards size={16}/></div><div className="ledger-copy"><b>{expense.description || categoryLabels[expense.category] || expense.category}</b><small>{expense.expenseDate} · {categoryLabels[expense.category] || expense.category}</small></div><strong>{money(expense.amountPaise)}</strong>{expense.reversedAt ? <span className="reversed-label">reversed</span> : <div className="ledger-actions"><button onClick={() => { setEditing(expense); setShowForm(true); }}>Edit</button><button onClick={() => void reverse(expense)}>Reverse</button></div>}</div>)}{data && !filtered.length && <div className="ledger-empty">Add the first expense to start calculating balances.</div>}</div><BudgetPanel tripId={tripId} budgets={data?.budgetSummary || []} onSaved={() => void load()}/>{showForm && <ExpenseForm tripId={tripId} people={data?.balances || []} defaultPayerId={data?.currentUserId} today={data?.today} stayOptions={data?.stayOptions || []} initial={editing} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); setEditing(undefined); void load(); }}/>}</section>;
 }
 
 function BudgetPanel({ tripId, budgets, onSaved }: { tripId: string; budgets: Budget[]; onSaved: () => void }) { const [category, setCategory] = useState("FOOD"); const [ruleType, setRuleType] = useState("PER_DAY"); const [amount, setAmount] = useState(""); const [effectiveFrom, setEffectiveFrom] = useState(""); const [message, setMessage] = useState(""); async function save() { try { const response = await fetch(`/api/trips/${tripId}/budget`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category, ruleType, amountPaise: rupeesToPaise(amount), effectiveFrom, idempotencyKey: crypto.randomUUID() }) }); if (!response.ok) throw new Error((await response.json() as { error?: string }).error || "Unable to save budget rule"); setMessage("Budget rule saved."); setAmount(""); onSaved(); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to save budget rule"); } } return <div className="budget-card"><div className="ledger-header"><div><span className="section-label">BUDGET</span><h3>Planned versus actual</h3></div><span className="estimate-label">Rules are estimates</span></div>{budgets.map((budget) => <div className="budget-row" key={budget.id}><div><b>{categoryLabels[budget.category] || budget.category}</b><small>{budget.ruleType} · from {budget.effectiveFrom}</small></div><span>{money(budget.actualPaise)} / {money(budget.plannedPaise)}</span><strong className={budget.status}>{budget.status}</strong></div>)}{!budgets.length && <p className="ledger-empty">No budget rules yet.</p>}<div className="budget-form"><select value={category} onChange={(event) => setCategory(event.target.value)}>{categories.map((item) => <option key={item}>{categoryLabels[item]}</option>)}</select><select value={ruleType} onChange={(event) => setRuleType(event.target.value)}><option value="PER_DAY">Per day</option><option value="PER_NIGHT">Per night</option><option value="TOTAL">Total</option><option value="DERIVED">Derived</option></select><input placeholder="₹ planned" value={amount} onChange={(event) => setAmount(event.target.value)}/><input type="date" value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)}/><button className="small-button primary-small" onClick={() => void save()}>Save rule</button></div>{message && <small className="budget-message">{message}</small>}</div>; }
@@ -45,6 +46,55 @@ export function ExpenseForm({ tripId, people, defaultPayerId, today, stayOptions
   const [custom, setCustom] = useState<Record<string, string>>(Object.fromEntries((initial?.shares || []).map((item) => [item.participantId, (item.amountPaise / 100).toFixed(2)])));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [stayOpen, setStayOpen] = useState(false);
+  const stayMenuRef = useRef<HTMLDivElement>(null);
+  const [closing, setClosing] = useState(false);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dimRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef(false);
+
+  useLayoutEffect(() => {
+    const backdrop = backdropRef.current;
+    const dim = dimRef.current;
+    const sheet = sheetRef.current;
+    if (!backdrop || !dim || !sheet) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return;
+    const context = gsap.context(() => {
+      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+      timeline.fromTo(dim, { opacity: 0 }, { opacity: 1, duration: 0.32, ease: "power2.out" })
+        .fromTo(sheet, { opacity: 0, y: 34, scale: 0.965, filter: "blur(6px)" }, { opacity: 1, y: 0, scale: 1, filter: "blur(0px)", duration: 0.58, ease: "back.out(1.35)" }, "-=0.12")
+        .fromTo(sheet.querySelector(".sheet-title"), { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.28 }, "-=0.27")
+        .fromTo(sheet.querySelector(".amount-input"), { opacity: 0, y: 14, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.3 }, "-=0.14")
+        .fromTo(sheet.querySelectorAll(".category-card"), { opacity: 0, y: 12, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.32, stagger: 0.035 }, "-=0.15")
+        .fromTo(sheet.querySelectorAll(".expense-fields, .stay-options, .fuel-fields, .payer-heading, .payer-row, .split-heading, .person-split"), { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.035 }, "-=0.16")
+        .fromTo(sheet.querySelector(".expense-sheet-footer"), { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.28 }, "-=0.12");
+    }, sheet);
+    return () => context.revert();
+  }, []);
+
+  useEffect(() => {
+    if (!stayOpen) return;
+    function closeMenu(event: MouseEvent) { if (!stayMenuRef.current?.contains(event.target as Node)) setStayOpen(false); }
+    function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") setStayOpen(false); }
+    document.addEventListener("mousedown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => { document.removeEventListener("mousedown", closeMenu); document.removeEventListener("keydown", closeOnEscape); };
+  }, [stayOpen]);
+
+  function handleClose() {
+    if (closeTimer.current) return;
+    closeTimer.current = true;
+    const backdrop = backdropRef.current;
+    const dim = dimRef.current;
+    const sheet = sheetRef.current;
+    if (!backdrop || !dim || !sheet || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { onClose(); return; }
+    setClosing(true);
+    gsap.timeline({ onComplete: onClose })
+      .to(sheet, { opacity: 0, y: 24, scale: 0.98, filter: "blur(4px)", duration: 0.25, ease: "power2.in" })
+      .to(dim, { opacity: 0, duration: 0.2, ease: "power2.in" }, "-=0.1");
+  }
 
   function handleAmountChange(val: string) {
     setAmount(val);
@@ -107,14 +157,15 @@ export function ExpenseForm({ tripId, people, defaultPayerId, today, stayOptions
   }
 
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div className="expense-sheet" onClick={(event) => event.stopPropagation()}>
+    <div className={closing ? "sheet-backdrop is-closing" : "sheet-backdrop"} ref={backdropRef} onClick={handleClose}>
+      <div className="sheet-dim" ref={dimRef} aria-hidden="true" />
+      <div className="expense-sheet" ref={sheetRef} onClick={(event) => event.stopPropagation()}>
         <div className="sheet-title">
           <div>
             {initial && <span className="section-label">EDIT EXPENSE</span>}
             <h2>Enter the amount</h2>
           </div>
-          <button type="button" className="close-button" onClick={onClose} aria-label="Close">
+          <button type="button" className="close-button" onClick={handleClose} aria-label="Close">
             <X size={18}/>
           </button>
         </div>
@@ -131,11 +182,12 @@ export function ExpenseForm({ tripId, people, defaultPayerId, today, stayOptions
             {categories.map((item) => (
               <button
                 type="button"
-                className={category === item ? "category-card selected" : "category-card"}
+                className={`category-card category-${item.toLowerCase()}${category === item ? " selected" : ""}`}
                 key={item}
                 onClick={() => setCategory(item)}
               >
                 {categoryLabels[item]}
+                {category === item && <span className="category-check" aria-hidden="true"><Check size={11} strokeWidth={3}/></span>}
               </button>
             ))}
           </div>
@@ -155,17 +207,11 @@ export function ExpenseForm({ tripId, people, defaultPayerId, today, stayOptions
           {category === "STAY" && stayOptions.length > 0 && (
             <div className="stay-options">
               <span className="field-label">Link this stay</span>
-              <div>
-                {stayOptions.map((stay) => (
-                  <button
-                    type="button"
-                    className={activityId === stay.id ? "stay-option selected" : "stay-option"}
-                    key={stay.id}
-                    onClick={() => { setActivityId(stay.id); setDescription(description || stay.label); }}
-                  >
-                    {stay.label}
-                  </button>
-                ))}
+              <div className={stayOpen ? "stay-dropdown open" : "stay-dropdown"} ref={stayMenuRef}>
+                <button type="button" className="stay-select" aria-haspopup="listbox" aria-expanded={stayOpen} onClick={() => setStayOpen((open) => !open)}>
+                  <span>{stayOptions.find((stay) => stay.id === activityId)?.label || "Choose a stay…"}</span><ChevronDown size={14}/>
+                </button>
+                {stayOpen && <div className="stay-menu" role="listbox">{stayOptions.map((stay) => <button type="button" role="option" aria-selected={activityId === stay.id} className={activityId === stay.id ? "stay-option selected" : "stay-option"} key={stay.id} onClick={() => { setActivityId(stay.id); if (!description) setDescription(stay.label); setStayOpen(false); }}>{stay.label}{activityId === stay.id && <Check size={13}/>}</button>)}</div>}
               </div>
             </div>
           )}
@@ -246,14 +292,12 @@ export function ExpenseForm({ tripId, people, defaultPayerId, today, stayOptions
               )}
             </label>
           ))}
-          <div className={assigned === amountPaise && paid === amountPaise ? "assigned good" : "assigned"}>
-            <span>Shares {money(assigned)} · Payments {money(paid)}</span>
-            <b>of {money(amountPaise)}</b>
+          <div className="expense-sheet-footer">
+            {error && <div className="money-error">{error}</div>}
+            <button className="expense-save-button" disabled={pending}>
+              {pending ? "Saving…" : "Save"}
+            </button>
           </div>
-          {error && <div className="money-error">{error}</div>}
-          <button className="auth-submit" disabled={pending}>
-            {pending ? "Saving…" : "Save expense"}
-          </button>
         </form>
       </div>
     </div>

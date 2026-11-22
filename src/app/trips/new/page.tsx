@@ -38,6 +38,7 @@ export default function NewTripPage() {
   const router = useRouter();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [fileName, setFileName] = useState("");
+  const [tripName, setTripName] = useState("");
   const [authMemberName, setAuthMemberName] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -58,6 +59,7 @@ export default function NewTripPage() {
 
   async function chooseFile(file: File) {
     setFileName(file.name);
+    setTripName("");
     setError("");
     const nextPreview = parseTripCsv(await file.text());
     setPreview(nextPreview);
@@ -74,7 +76,7 @@ export default function NewTripPage() {
     setPending(true); setError("");
     const payload = {
       idempotencyKey: crypto.randomUUID(),
-      trip: { name: preview.trip.trip_name, startDate: preview.trip.start_date, endDate: preview.trip.end_date, timezone: preview.trip.timezone || "Asia/Kolkata", currency: preview.trip.currency || "INR" },
+      trip: { name: tripName.trim(), startDate: preview.trip.start_date, endDate: preview.trip.end_date, timezone: preview.trip.timezone || "Asia/Kolkata", currency: preview.trip.currency || "INR" },
       members: preview.members.map((member) => ({ name: member.member_name, email: member.member_email || undefined })),
       authMemberName,
       activities: preview.activities.map((activity) => ({ type: activity.activity_type as "TRAVEL" | "STAY" | "EXPLORATION" | "CUSTOM", title: activity.title, date: activity.date, startTime: activity.start_time || undefined, endTime: activity.end_time || undefined, origin: activity.origin || undefined, destination: activity.destination || undefined, location: activity.location || undefined, viaPoints: activity.via_points || undefined, mapsUrl: activity.maps_url || undefined, distanceKmMilli: activity.distance_km ? Math.round(Number(activity.distance_km) * 1000) : undefined, bikeId: activity.bike_id || undefined, status: (activity.status || "planned") as "planned" | "done" | "skipped" })),
@@ -135,6 +137,12 @@ export default function NewTripPage() {
           )}
         </div>
 
+        <label className="trip-name-field">
+          Trip name
+          <input value={tripName} onChange={(event) => setTripName(event.target.value)} placeholder="e.g. Konkan Coast Ride" required />
+          <small>This name is used for the shared trip, regardless of the CSV title.</small>
+        </label>
+
         <label className="csv-picker">
           <input
             type="file"
@@ -150,7 +158,7 @@ export default function NewTripPage() {
 
         {preview && (
           <div className="csv-summary">
-            <strong>{preview.trip?.trip_name || "Untitled trip"}</strong>
+            <strong>{tripName || preview.trip?.trip_name || "Untitled trip"}</strong>
             <span>{preview.members.length} members · {preview.activities.length} activities</span>
             <label className="member-link-field">
               Which CSV member is you?
@@ -174,7 +182,7 @@ export default function NewTripPage() {
         {error && <div className="auth-error">{error}</div>}
 
         <form onSubmit={submit}>
-          <button className="auth-submit" disabled={pending || !preview || !authMemberName}>
+          <button className="auth-submit" disabled={pending || !preview || !authMemberName || !tripName.trim()}>
             {pending ? "Saving trip…" : "Create trip from CSV"}
           </button>
         </form>

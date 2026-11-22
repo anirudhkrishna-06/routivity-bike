@@ -105,6 +105,11 @@ export function AppShell({ user, trips, initialTripId }: Props) {
     }, 260);
   }
 
+  function goToTripNow() {
+    if (active === "Trip Now") { goToAllTrips(); return; }
+    go("Trip Now");
+  }
+
   return (
     <main className={dark ? "app dark" : "app"}>
       <div className="app-frame">
@@ -112,9 +117,9 @@ export function AppShell({ user, trips, initialTripId }: Props) {
           {selectedTrip && (
             <button
               className="topbar-back"
-              onClick={goToAllTrips}
-              aria-label="Back to all trips"
-              title="Back to all trips"
+              onClick={goToTripNow}
+              aria-label={active === "Trip Now" ? "Back to all trips" : "Back to Trip Now dashboard"}
+              title={active === "Trip Now" ? "Back to all trips" : "Back to Trip Now dashboard"}
             >
               <ArrowLeft size={18} />
             </button>
@@ -152,13 +157,14 @@ export function AppShell({ user, trips, initialTripId }: Props) {
           <section className="trip-hub rise-in">
             <div className="hub-heading">
               <div>
-                <span className="section-label">YOUR TRIPS</span>
+                
                 <h1>Where are you going?</h1>
                 <p>Select a trip to open its live dashboard, itinerary, money, and shared settings.</p>
               </div>
-              <Link className="primary-button" href="/trips/new">
-                <Plus size={17} /> New trip
-              </Link>
+            </div>
+            <div className="hub-action-grid">
+              <Link className="hub-action-card add" href="/trips/new"><Plus size={18}/><span><b>ADD</b></span></Link>
+              <Link className="hub-action-card join" href="/join"><ArrowLeft size={18}/><span><b>JOIN</b></span></Link>
             </div>
             {trips.length === 0 ? (
               <div className="empty-trip">
