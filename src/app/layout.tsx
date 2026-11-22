@@ -8,6 +8,7 @@ import "./real-dashboard.css";
 import "./import-trip.css";
 import "../components/money-workspace.css";
 import "../components/settlement-workspace.css";
+import "../components/money-hub.css";
 import "./budget.css";
 import "./danger.css";
 import "./trip-settings.css";
@@ -34,13 +35,21 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
       <head>
-        <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/sf-pro-display" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.cdnfonts.com/css/sf-pro-display"
+        />
       </head>
-      <body><OfflineBanner />{children}</body>
+      <body>
+        <OfflineBanner />
+        {children}
+      </body>
     </html>
   );
 }

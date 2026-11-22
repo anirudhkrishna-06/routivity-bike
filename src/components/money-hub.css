@@ -1,0 +1,113 @@
+.sync-indicator {
+  width: max-content;
+  margin: -8px auto 12px;
+  padding: 4px 9px;
+  border-radius: 10px;
+  background: #edf3eb;
+  color: #285f48;
+  font-size: 10px;
+  font-weight: 700;
+}
+.pending-sync-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #d78a18;
+  box-shadow: 0 0 0 3px #f8e7c6;
+}
+.settled-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #285f48;
+  font-weight: 700;
+}
+.settled-meta svg {
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  animation: draw-check 0.42s ease-out forwards;
+}
+.segmented-meter i {
+  transition: width 0.42s ease-out;
+}
+.money-segments button {
+  position: relative;
+  z-index: 1;
+  transition:
+    background-color 0.28s ease,
+    transform 0.28s ease;
+}
+.money-segments button.active {
+  background: transparent;
+  color: #fffefa;
+  transform: none;
+}
+.money-segments {
+  position: relative;
+}
+.segment-indicator {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 3);
+  height: 40px;
+  border-radius: 15px;
+  background: #285f48;
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.settlement-toast {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: 98px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 12px 15px;
+  border-radius: 14px;
+  background: #19231d;
+  color: #fffefa;
+  box-shadow: 0 10px 26px #19231d30;
+  font-size: 12px;
+  animation: toast-in 0.28s ease-out;
+}
+.settlement-toast button {
+  border: 0;
+  background: none;
+  color: #b9e7bf;
+  font-weight: 800;
+  font-size: 12px;
+}
+@keyframes draw-check {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .segmented-meter i,
+  .money-segments button,
+  .segment-indicator {
+    transition: none;
+  }
+  .settled-meta svg,
+  .settlement-toast {
+    animation: none;
+  }
+  .settled-meta svg {
+    stroke-dashoffset: 0;
+  }
+}
