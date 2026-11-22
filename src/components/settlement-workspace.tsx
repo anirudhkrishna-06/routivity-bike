@@ -9,7 +9,8 @@ type Round = { id: string; status: string; createdAt: string };
 type Transfer = { id: string; roundId: string; senderId: string; receiverId: string; amountPaise: number; status: string };
 function money(paise: number) { return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(paise / 100); }
 
-export function SettlementWorkspace({ tripId }: { tripId: string }) {
+export function SettlementWorkspace({ tripId, onAddExpense }: { tripId: string; onAddExpense?: () => void }) {
+  if (onAddExpense) void onAddExpense;
   const [balances, setBalances] = useState<Balance[]>([]); const [suggestions, setSuggestions] = useState<Suggestion[]>([]); const [rounds, setRounds] = useState<Round[]>([]); const [transfers, setTransfers] = useState<Transfer[]>([]); const [roundId, setRoundId] = useState(""); const [error, setError] = useState(""); const [pending, setPending] = useState(false);
   async function load() { const response = await fetch("/api/trips/" + tripId + "/settlement"); const body = await response.json() as { balances?: Balance[]; suggestions?: Suggestion[]; rounds?: Round[]; transfers?: Transfer[]; error?: string }; if (response.ok) { setBalances(body.balances || []); setSuggestions(body.suggestions || []); setRounds(body.rounds || []); setTransfers(body.transfers || []); } else setError(body.error || "Unable to load settlements."); }
   // The settlement screen mirrors only confirmed server balances.

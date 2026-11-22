@@ -15,6 +15,8 @@ import "./dashboard.css";
 import "./money-actions.css";
 import "./fuel-fields.css";
 import "./payer-fields.css";
+import "./fuel-intelligence.css";
+import "./activity-editor.css";
 import { OfflineBanner } from "../components/offline-banner";
 
 export const metadata: Metadata = {

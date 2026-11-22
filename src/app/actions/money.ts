@@ -3,7 +3,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { activities, auditEvents, bikes, budgetRuleHistory, budgetRules, expensePayments, expenseRevisions, expenses, expenseShares, itineraryDays, participants, settlementRounds, settlementTransfers, mutations, trips } from "@/lib/db/schema";
+import { activities, auditEvents, bikes, budgetRuleHistory, budgetRules, expensePayments, expenseRevisions, expenses, expenseShares, itineraryDays, participants, settlementRounds, settlementTransfers, mutations, trips, syncConflicts } from "@/lib/db/schema";
 import { invalidateTripCache } from "@/lib/cache";
 import { assertTripMember } from "@/lib/access";
 
@@ -11,7 +11,7 @@ type PaymentInput = { participantId: string; amountPaise: number };
 type ShareInput = { participantId: string; amountPaise: number };
 type ExpenseInput = {
   tripId: string; idempotencyKey: string; amountPaise: number; description?: string; category: string; expenseDate: string;
-  payments: PaymentInput[]; shares: ShareInput[]; activityId?: string; litresMilli?: number; odometerKmMilli?: number;
+  payments: PaymentInput[]; shares: ShareInput[]; activityId?: string; bikeId?: string; litresMilli?: number; odometerKmMilli?: number;
 };
 type Db = NonNullable<typeof db>;
 type Tx = Pick<Db, "select" | "insert" | "update" | "delete">;
@@ -56,7 +56,7 @@ export async function createExpense(input: ExpenseInput) {
   if (total(input.payments) !== input.amountPaise) throw new Error("Payments must add up exactly to the expense amount");
   if (total(input.shares) !== input.amountPaise) throw new Error("Shares must add up exactly to the expense amount");
   const result = await db!.transaction(async (tx) => {
-    const [expense] = await tx.insert(expenses).values({ tripId: input.tripId, activityId: input.activityId, description: input.description?.trim() || null, category: input.category, expenseDate: input.expenseDate, enteredBy: user.id, amountPaise: input.amountPaise, litres: input.litresMilli, odometerKm: input.odometerKmMilli }).returning();
+    const [expense] = await tx.insert(expenses).values({ tripId: input.tripId, activityId: input.activityId, description: input.description?.trim() || null, category: input.category, expenseDate: input.expenseDate, enteredBy: user.id, bikeId: input.bikeId, amountPaise: input.amountPaise, litres: input.litresMilli, odometerKm: input.odometerKmMilli }).returning();
     await tx.insert(expensePayments).values(input.payments.map((item) => ({ expenseId: expense.id, participantId: item.participantId, amountPaise: item.amountPaise })));
     await tx.insert(expenseShares).values(input.shares.map((item) => ({ expenseId: expense.id, participantId: item.participantId, amountPaise: item.amountPaise })));
     await audit(input.tripId, user.id, "created", expense.id, { amountPaise: input.amountPaise, category: input.category }, tx);
@@ -68,12 +68,13 @@ export async function createExpense(input: ExpenseInput) {
   return result;
 }
 
-export async function editExpense(input: { tripId: string; expenseId: string; idempotencyKey: string; change: Partial<ExpenseInput> }) {
+export async function editExpense(input: { tripId: string; expenseId: string; idempotencyKey: string; baseVersion?: number; change: Partial<ExpenseInput> }) {
   const { user } = await requireMember(input.tripId);
   const replay = await idempotentResult(input);
   if (replay) return replay;
   const current = await db!.query.expenses.findFirst({ where: and(eq(expenses.id, input.expenseId), eq(expenses.tripId, input.tripId)) });
   if (!current || current.reversedAt) throw new Error("Expense not found or already reversed");
+  if (input.baseVersion !== undefined && input.baseVersion !== current.version) { const conflict = await db!.insert(syncConflicts).values({ tripId: input.tripId, entityType: "expense", entityId: current.id, base: { version: input.baseVersion }, mine: input.change, theirs: current, createdBy: user.id }).returning({ id: syncConflicts.id }); throw new Error("CONFLICT:" + conflict[0].id); }
   const amountPaise = input.change.amountPaise ?? current.amountPaise;
   const payments = input.change.payments ?? await db!.query.expensePayments.findMany({ where: eq(expensePayments.expenseId, current.id) });
   const shares = input.change.shares ?? await db!.query.expenseShares.findMany({ where: eq(expenseShares.expenseId, current.id) });
@@ -84,7 +85,7 @@ export async function editExpense(input: { tripId: string; expenseId: string; id
     await tx.delete(expenseShares).where(eq(expenseShares.expenseId, current.id));
     await tx.insert(expensePayments).values(payments.map((item) => ({ expenseId: current.id, participantId: item.participantId, amountPaise: item.amountPaise })));
     await tx.insert(expenseShares).values(shares.map((item) => ({ expenseId: current.id, participantId: item.participantId, amountPaise: item.amountPaise })));
-    const [updated] = await tx.update(expenses).set({ amountPaise, description: input.change.description ?? current.description, category: input.change.category ?? current.category, expenseDate: input.change.expenseDate ?? current.expenseDate, activityId: input.change.activityId ?? current.activityId, version: current.version + 1 }).where(eq(expenses.id, current.id)).returning();
+    const [updated] = await tx.update(expenses).set({ amountPaise, description: input.change.description ?? current.description, category: input.change.category ?? current.category, expenseDate: input.change.expenseDate ?? current.expenseDate, activityId: input.change.activityId ?? current.activityId, bikeId: input.change.bikeId ?? current.bikeId, litres: input.change.litresMilli ?? current.litres, odometerKm: input.change.odometerKmMilli ?? current.odometerKm, version: current.version + 1 }).where(eq(expenses.id, current.id)).returning();
     await audit(input.tripId, user.id, "revised", current.id, input.change, tx);
     const payload = { expenseId: updated.id };
     await tx.insert(mutations).values({ idempotencyKey: input.idempotencyKey, tripId: input.tripId, actorId: user.id, result: JSON.stringify(payload) });
@@ -178,9 +179,12 @@ export async function getMoneyOverview(tripId: string) {
   for (const row of expenseRows) if (!row.reversedAt) actualByCategory.set(row.category, (actualByCategory.get(row.category) || 0) + row.amountPaise);
   const bikeMap = new Map(bikeRows.map((bike) => [bike.id, bike]));
   const derivedFuel = travelLegs.reduce((sum, leg) => { const bike = leg.bikeId ? bikeMap.get(leg.bikeId) : undefined; if (!leg.distanceKmMilli || !bike?.mileageKmplMilli || !bike.fuelPricePaisePerLitre) return sum; return sum + Math.floor((leg.distanceKmMilli * bike.fuelPricePaisePerLitre + Math.floor(bike.mileageKmplMilli / 2)) / bike.mileageKmplMilli); }, 0);
+  const fuelExpenses = expenseRows.filter((row) => !row.reversedAt && row.category === "FUEL" && row.litres && row.odometerKm).sort((a, b) => (a.odometerKm || 0) - (b.odometerKm || 0));
+  const fuelInsights = bikeRows.map((bike) => { const legs = travelLegs.filter((leg) => leg.bikeId === bike.id); const plannedDistanceKm = legs.reduce((sum, leg) => sum + (leg.distanceKmMilli || 0), 0) / 1000; const actual = fuelExpenses.filter((row) => row.bikeId === bike.id); const litres = actual.reduce((sum, row) => sum + (row.litres || 0), 0) / 1000; const actualCostPaise = actual.reduce((sum, row) => sum + row.amountPaise, 0); const first = actual[0]?.odometerKm ?? null; const last = actual.at(-1)?.odometerKm ?? null; const actualMileage = first !== null && last !== null && last > first && litres > 0 ? (last - first) / 1000 / litres : null; return { bikeId: bike.id, bikeName: bike.name, assumedMileageKmpl: bike.mileageKmplMilli ? bike.mileageKmplMilli / 1000 : null, fuelPricePaisePerLitre: bike.fuelPricePaisePerLitre, plannedDistanceKm, plannedFuelCostPaise: legs.reduce((sum, leg) => { if (!leg.distanceKmMilli || !bike.mileageKmplMilli || !bike.fuelPricePaisePerLitre) return sum; return sum + Math.floor((leg.distanceKmMilli * bike.fuelPricePaisePerLitre + Math.floor(bike.mileageKmplMilli / 2)) / bike.mileageKmplMilli); }, 0), actualLitres: litres, actualCostPaise, actualMileageKmpl: actualMileage }; });
   const budgetSummary = rules.map((rule) => { const remainingDays = trip ? Math.max(1, days.filter((day) => day.date >= rule.effectiveFrom && day.date <= trip.endDate).length) : 1; const plannedPaise = rule.ruleType === "PER_DAY" ? rule.amountPaise * remainingDays : rule.ruleType === "PER_NIGHT" ? rule.amountPaise * Math.max(0, remainingDays - 1) : rule.ruleType === "DERIVED" && rule.category === "FUEL" ? derivedFuel : rule.amountPaise; const actualPaise = actualByCategory.get(rule.category) || 0; const utilisation = plannedPaise ? actualPaise / plannedPaise : 0; return { ...rule, plannedPaise, actualPaise, variancePaise: actualPaise - plannedPaise, status: utilisation > 1 ? "over" : utilisation >= 0.8 ? "approaching" : "within" }; });
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: trip?.timezone || "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  return { expenses: expenseRows.map((row) => ({ ...row, payments: payments.filter((item) => item.expenseId === row.id), shares: shares.filter((item) => item.expenseId === row.id) })), balances, suggestions: minimumSuggestions(balances), budgets: rules, budgetSummary, rounds, transfers, currentUserId: membership!.id, today, stayOptions: stayRows.map((row) => ({ id: row.id, label: row.location || row.title })) };
+  const activeExpenses = expenseRows.filter((row) => !row.reversedAt); const elapsedDays = trip ? Math.max(1, days.filter((day) => day.date <= today).length) : 0; const remainingDays = trip ? Math.max(0, days.length - elapsedDays) : 0; const actualTotalPaise = activeExpenses.reduce((sum, row) => sum + row.amountPaise, 0); const remainingPlannedPaise = budgetSummary.reduce((sum, row) => sum + Math.max(0, row.plannedPaise - row.actualPaise), 0); const forecast = activeExpenses.length >= 2 && elapsedDays > 0 ? { projectedPaise: actualTotalPaise + Math.max(remainingPlannedPaise, Math.round(actualTotalPaise / elapsedDays) * remainingDays), remainingPlannedPaise, label: "Estimate based on current pace and remaining plan" } : null;
+  return { expenses: expenseRows.map((row) => ({ ...row, payments: payments.filter((item) => item.expenseId === row.id), shares: shares.filter((item) => item.expenseId === row.id) })), balances, suggestions: minimumSuggestions(balances), budgets: rules, budgetSummary, fuelInsights, forecast, rounds, transfers, currentUserId: membership!.id, today, stayOptions: stayRows.map((row) => ({ id: row.id, label: row.location || row.title })), bikeOptions: bikeRows.map((row) => ({ id: row.id, label: row.name })) };
 }
 
 export async function saveBudgetRule(input: { tripId: string; ruleId?: string; category: string; ruleType: string; amountPaise: number; effectiveFrom: string; idempotencyKey: string }) {
@@ -274,4 +278,7 @@ export async function closeSettlementRound(input: { tripId: string; roundId: str
   await audit(input.tripId, user.id, "settlement-closed", round.id, {});
   return round;
 }
+
+export async function listSyncConflicts(tripId: string) { await requireMember(tripId); if (!db) throw new Error("Database is not configured"); return db.query.syncConflicts.findMany({ where: and(eq(syncConflicts.tripId, tripId), eq(syncConflicts.status, "open")), orderBy: (row, { desc }) => [desc(row.createdAt)] }); }
+export async function resolveSyncConflict(input: { tripId: string; conflictId: string; resolution: "mine" | "theirs" | "merged"; merged?: Record<string, unknown> }) { const { user } = await requireMember(input.tripId); if (!db) throw new Error("Database is not configured"); const [conflict] = await db.update(syncConflicts).set({ status: "resolved", resolution: { choice: input.resolution, merged: input.merged || null }, resolvedAt: new Date() }).where(and(eq(syncConflicts.id, input.conflictId), eq(syncConflicts.tripId, input.tripId), eq(syncConflicts.status, "open"))).returning(); if (!conflict) throw new Error("Conflict not found or already resolved"); await audit(input.tripId, user.id, "sync-conflict-resolved", conflict.id, { resolution: input.resolution, merged: input.merged || null }); return conflict; }
 

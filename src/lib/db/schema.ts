@@ -65,11 +65,22 @@ export const invitations = pgTable("invitations", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const tripJoinCodes = pgTable("trip_join_codes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  codeHash: varchar("code_hash", { length: 128 }).notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  active: boolean("active").default(true).notNull(),
+  createdBy: uuid("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const itineraryDays = pgTable("itinerary_days", {
   id: uuid("id").defaultRandom().primaryKey(),
   tripId: uuid("trip_id").references(() => trips.id).notNull(),
   dayNumber: integer("day_number").notNull(),
   date: date("date").notNull(),
+  location: text("location"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({ tripDay: uniqueIndex("itinerary_days_trip_day_idx").on(table.tripId, table.dayNumber) }));
 
@@ -114,6 +125,7 @@ export const expenses = pgTable("expenses", {
   category: varchar("category", { length: 60 }).default("MISCELLANEOUS").notNull(),
   expenseDate: date("expense_date").notNull(),
   enteredBy: uuid("entered_by").references(() => users.id).notNull(),
+  bikeId: uuid("bike_id").references(() => bikes.id),
   amountPaise: integer("amount_paise").notNull(),
   litres: integer("litres_milli"),
   odometerKm: integer("odometer_km_milli"),
@@ -212,5 +224,34 @@ export const mutations = pgTable("mutations", {
   tripId: uuid("trip_id").references(() => trips.id).notNull(),
   actorId: uuid("actor_id").references(() => users.id).notNull(),
   result: text("result").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const restructuringProposals = pgTable("restructuring_proposals", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  kind: varchar("kind", { length: 60 }).notNull(),
+  status: varchar("status", { length: 20 }).default("proposed").notNull(),
+  beforeSnapshot: jsonb("before_snapshot").notNull(),
+  afterSnapshot: jsonb("after_snapshot").notNull(),
+  diff: jsonb("diff").notNull(),
+  createdBy: uuid("created_by").references(() => users.id).notNull(),
+  appliedAt: timestamp("applied_at", { withTimezone: true }),
+  undoneAt: timestamp("undone_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const syncConflicts = pgTable("sync_conflicts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tripId: uuid("trip_id").references(() => trips.id).notNull(),
+  entityType: varchar("entity_type", { length: 60 }).notNull(),
+  entityId: uuid("entity_id").notNull(),
+  base: jsonb("base").notNull(),
+  mine: jsonb("mine").notNull(),
+  theirs: jsonb("theirs").notNull(),
+  status: varchar("status", { length: 20 }).default("open").notNull(),
+  resolution: jsonb("resolution"),
+  createdBy: uuid("created_by").references(() => users.id).notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -5,7 +5,7 @@ import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { assertTripMember } from "@/lib/access";
 import { db } from "@/lib/db";
-import { activities, auditEvents, budgetRuleHistory, budgetRules, expensePayments, expenseRevisions, expenseShares, expenses, invitations, itineraryDays, mutations, participants, settlementRounds, settlementTransfers, trips, users, bikes } from "@/lib/db/schema";
+import { activities, auditEvents, budgetRuleHistory, budgetRules, expensePayments, expenseRevisions, expenseShares, expenses, invitations, itineraryDays, mutations, participants, settlementRounds, settlementTransfers, trips, users, bikes, restructuringProposals, syncConflicts, tripJoinCodes } from "@/lib/db/schema";
 import { invalidateTripCache } from "@/lib/cache";
 import { buildMapsUrl } from "@/lib/maps";
 
@@ -81,6 +81,39 @@ export async function createInvite(input: { tripId: string; name: string; email?
 export async function listTripMembers(tripId: string) {
   await member(tripId); if (!db) throw new Error("Database is not configured");
   return db.query.participants.findMany({ where: eq(participants.tripId, tripId) });
+}
+
+function joinCode() { return `RVTY-${randomBytes(4).toString("hex").toUpperCase()}`; }
+
+export async function createTripJoinCode(tripId: string) {
+  const { user } = await member(tripId, true); if (!db) throw new Error("Database is not configured");
+  const code = joinCode(); const expiresAt = new Date(Date.now() + 30 * 86400000);
+  await db.update(tripJoinCodes).set({ active: false }).where(eq(tripJoinCodes.tripId, tripId));
+  await db.insert(tripJoinCodes).values({ tripId, codeHash: tokenHash(code), expiresAt, createdBy: user.id });
+  const trip = await db.query.trips.findFirst({ where: eq(trips.id, tripId) });
+  return { code, shareUrl: `/join?code=${encodeURIComponent(code)}`, expiresAt: expiresAt.toISOString(), tripName: trip?.name || "Trip" };
+}
+
+export async function lookupTripJoinCode(rawCode: string) {
+  if (!db) throw new Error("Database is not configured"); const code = rawCode.trim().toUpperCase();
+  const join = await db.query.tripJoinCodes.findFirst({ where: and(eq(tripJoinCodes.codeHash, tokenHash(code)), eq(tripJoinCodes.active, true), gte(tripJoinCodes.expiresAt, new Date())) });
+  if (!join) throw new Error("That sharing code is invalid or expired");
+  const trip = await db.query.trips.findFirst({ where: eq(trips.id, join.tripId) });
+  const candidates = await db.query.participants.findMany({ where: and(eq(participants.tripId, join.tripId), eq(participants.status, "active")) });
+  return { trip: trip ? { id: trip.id, name: trip.name } : null, candidates: candidates.filter((item) => !item.userId).map((item) => ({ id: item.id, name: item.name })) };
+}
+
+export async function acceptTripJoinCode(input: { code: string; participantId: string }) {
+  const user = await actor(); if (!db) throw new Error("Database is not configured"); const code = input.code.trim().toUpperCase();
+  const join = await db.query.tripJoinCodes.findFirst({ where: and(eq(tripJoinCodes.codeHash, tokenHash(code)), eq(tripJoinCodes.active, true), gte(tripJoinCodes.expiresAt, new Date())) });
+  if (!join) throw new Error("That sharing code is invalid or expired");
+  const participant = await db.query.participants.findFirst({ where: and(eq(participants.id, input.participantId), eq(participants.tripId, join.tripId), eq(participants.status, "active")) });
+  if (!participant) throw new Error("Choose a valid trip member");
+  const existing = await db.query.participants.findFirst({ where: and(eq(participants.tripId, join.tripId), eq(participants.userId, user.id), eq(participants.status, "active")) });
+  if (existing && existing.id !== participant.id) throw new Error(`You already joined this trip as ${existing.name}`);
+  if (participant.userId && participant.userId !== user.id) throw new Error("That member slot is already claimed");
+  await db.transaction(async (tx) => { await tx.update(participants).set({ userId: user.id, email: user.email }).where(eq(participants.id, participant.id)); await audit(tx, join.tripId, user.id, "joined-by-code", participant.id, { memberName: participant.name }); });
+  return { tripId: join.tripId };
 }
 
 export async function listTripActivities(tripId: string) {
@@ -218,8 +251,11 @@ export async function deleteTrip(tripId: string, reason: string) {
     await tx.delete(budgetRules).where(eq(budgetRules.tripId, tripId));
     await tx.delete(expenses).where(eq(expenses.tripId, tripId));
     await tx.delete(mutations).where(eq(mutations.tripId, tripId));
+    await tx.delete(restructuringProposals).where(eq(restructuringProposals.tripId, tripId));
+    await tx.delete(syncConflicts).where(eq(syncConflicts.tripId, tripId));
     await tx.delete(auditEvents).where(eq(auditEvents.tripId, tripId));
     await tx.delete(invitations).where(eq(invitations.tripId, tripId));
+    await tx.delete(tripJoinCodes).where(eq(tripJoinCodes.tripId, tripId));
     await tx.delete(activities).where(eq(activities.tripId, tripId));
     await tx.delete(bikes).where(eq(bikes.tripId, tripId));
     await tx.delete(itineraryDays).where(eq(itineraryDays.tripId, tripId));
@@ -229,3 +265,35 @@ export async function deleteTrip(tripId: string, reason: string) {
   await invalidateTripCache(tripId);
   return { tripId, deletedBy: user.id };
 }
+
+type ScheduleSnapshot = { trip: { startDate: string; endDate: string }; days: { id: string; dayNumber: number; date: string; location: string | null }[]; activities: { id: string; dayId: string; startTime: string | null; endTime: string | null; sortOrder: number; archived: boolean }[] };
+function shiftDate(value: string, days: number) { const next = new Date(`${value}T00:00:00Z`); next.setUTCDate(next.getUTCDate() + days); return next.toISOString().slice(0, 10); }
+async function scheduleSnapshot(tripId: string): Promise<ScheduleSnapshot> { if (!db) throw new Error("Database is not configured"); const [trip, days, activityRows] = await Promise.all([db.query.trips.findFirst({ where: eq(trips.id, tripId) }), db.query.itineraryDays.findMany({ where: eq(itineraryDays.tripId, tripId), orderBy: (row, { asc }) => [asc(row.dayNumber)] }), db.query.activities.findMany({ where: eq(activities.tripId, tripId) })]); if (!trip) throw new Error("Trip not found"); return { trip: { startDate: trip.startDate, endDate: trip.endDate }, days: days.map((day) => ({ id: day.id, dayNumber: day.dayNumber, date: day.date, location: day.location })), activities: activityRows.map((item) => ({ id: item.id, dayId: item.dayId, startTime: item.startTime, endTime: item.endTime, sortOrder: item.sortOrder, archived: item.archived })) }; }
+
+export async function proposeAddDay(input: { tripId: string; afterDayNumber: number; locationHint?: string }) {
+  const { user } = await member(input.tripId); if (!db) throw new Error("Database is not configured");
+  const before = await scheduleSnapshot(input.tripId); const anchor = before.days.find((day) => day.dayNumber === input.afterDayNumber); if (!anchor) throw new Error("Choose an existing trip day");
+  const after: ScheduleSnapshot = { trip: { ...before.trip, endDate: shiftDate(before.trip.endDate, 1) }, days: before.days.flatMap((day) => day.dayNumber <= input.afterDayNumber ? [day] : [{ ...day, dayNumber: day.dayNumber + 1, date: shiftDate(day.date, 1) }]), activities: before.activities };
+  const inserted = { id: "new-day", dayNumber: input.afterDayNumber + 1, date: shiftDate(anchor.date, 1), location: input.locationHint || anchor.location }; after.days.splice(input.afterDayNumber, 0, inserted);
+  const shifted = before.days.filter((day) => day.dayNumber > input.afterDayNumber).length;
+  const diff = { kind: "add-day", locationHint: input.locationHint || null, added: inserted, shiftedDays: shifted, budgetImpact: "Per-day rules will include the added day; existing expenses remain unchanged." };
+  const [proposal] = await db.insert(restructuringProposals).values({ tripId: input.tripId, kind: "add-day", beforeSnapshot: before, afterSnapshot: after, diff, createdBy: user.id }).returning();
+  return { proposal, diff };
+}
+
+export async function proposeMoveActivity(input: { tripId: string; activityId: string; targetDate?: string; mode?: "same-day" | "move-day" | "replace" }) {
+  const { user } = await member(input.tripId); if (!db) throw new Error("Database is not configured"); const current = await db.query.activities.findFirst({ where: and(eq(activities.id, input.activityId), eq(activities.tripId, input.tripId), eq(activities.archived, false)) }); if (!current) throw new Error("Activity not found"); if (!current.movable) throw new Error("This activity is fixed and cannot be moved automatically"); const snapshot = await scheduleSnapshot(input.tripId); const currentDay = snapshot.days.find((day) => day.id === current.dayId); if (!currentDay) throw new Error("Activity day not found"); const target = input.targetDate ? snapshot.days.find((day) => day.date === input.targetDate) : snapshot.days.find((day) => day.id !== current.dayId && (!current.location || !day.location || day.location.toLowerCase().includes(current.location.toLowerCase()) || current.location.toLowerCase().includes(day.location.toLowerCase()))); if (!target) throw new Error("No compatible day is available for this activity"); const collision = snapshot.activities.find((item) => item.id !== current.id && item.dayId === target.id && item.startTime && item.endTime && current.startTime && current.endTime && overlaps(item.startTime, item.endTime, current.startTime, current.endTime)); if (collision && input.mode !== "replace") throw new Error("NO_SLOT:" + collision.id); const after: ScheduleSnapshot = { ...snapshot, activities: snapshot.activities.map((item) => item.id === current.id ? { ...item, dayId: target.id } : item) }; const diff = { kind: "move-activity", activityId: current.id, title: current.title, from: { day: currentDay.dayNumber, date: currentDay.date }, to: { day: target.dayNumber, date: target.date, location: target.location }, mode: input.mode || "move-day", collision: collision?.id || null, expensesUntouched: true }; const [proposal] = await db.insert(restructuringProposals).values({ tripId: input.tripId, kind: "move-activity", beforeSnapshot: snapshot, afterSnapshot: after, diff, createdBy: user.id }).returning(); return { proposal, diff };
+}
+
+export async function applyRestructuringProposal(input: { tripId: string; proposalId: string }) {
+  const { user } = await member(input.tripId); if (!db) throw new Error("Database is not configured"); const proposal = await db.query.restructuringProposals.findFirst({ where: and(eq(restructuringProposals.id, input.proposalId), eq(restructuringProposals.tripId, input.tripId)) }); if (!proposal || proposal.status !== "proposed") throw new Error("Proposal is no longer available");
+  const after = proposal.afterSnapshot as ScheduleSnapshot;
+  await db.transaction(async (tx) => { const existing = await tx.select({ id: itineraryDays.id }).from(itineraryDays).where(eq(itineraryDays.tripId, input.tripId)); await tx.update(trips).set({ endDate: after.trip.endDate, updatedAt: new Date() }).where(eq(trips.id, input.tripId)); for (const [index, row] of existing.entries()) await tx.update(itineraryDays).set({ dayNumber: -100000 - index }).where(eq(itineraryDays.id, row.id)); for (const day of after.days) { if (day.id === "new-day") await tx.insert(itineraryDays).values({ tripId: input.tripId, dayNumber: day.dayNumber, date: day.date, location: day.location }); else await tx.update(itineraryDays).set({ dayNumber: day.dayNumber, date: day.date, location: day.location }).where(eq(itineraryDays.id, day.id)); } for (const item of after.activities) await tx.update(activities).set({ dayId: item.dayId, startTime: item.startTime, endTime: item.endTime, sortOrder: item.sortOrder, archived: item.archived, updatedAt: new Date() }).where(and(eq(activities.id, item.id), eq(activities.tripId, input.tripId))); await tx.update(restructuringProposals).set({ status: "applied", appliedAt: new Date() }).where(eq(restructuringProposals.id, input.proposalId)); await tx.insert(auditEvents).values({ tripId: input.tripId, actorId: user.id, action: "itinerary-restructured", entityType: "restructuring", entityId: input.proposalId, details: JSON.stringify(proposal.diff) }); }); await invalidateTripCache(input.tripId); return { proposalId: input.proposalId, status: "applied" };
+}
+
+export async function undoRestructuring(input: { tripId: string; proposalId: string }) {
+  const { user } = await member(input.tripId); if (!db) throw new Error("Database is not configured"); const proposal = await db.query.restructuringProposals.findFirst({ where: and(eq(restructuringProposals.id, input.proposalId), eq(restructuringProposals.tripId, input.tripId)) }); if (!proposal || proposal.status !== "applied") throw new Error("Only an applied restructuring can be undone"); const before = proposal.beforeSnapshot as ScheduleSnapshot;
+  await db.transaction(async (tx) => { const current = await tx.select({ id: itineraryDays.id }).from(itineraryDays).where(eq(itineraryDays.tripId, input.tripId)); const wanted = new Set(before.days.map((day) => day.id)); for (const row of current) if (!wanted.has(row.id)) await tx.delete(itineraryDays).where(eq(itineraryDays.id, row.id)); await tx.update(trips).set({ endDate: before.trip.endDate, updatedAt: new Date() }).where(eq(trips.id, input.tripId)); for (const day of before.days) await tx.update(itineraryDays).set({ dayNumber: day.dayNumber, date: day.date, location: day.location }).where(eq(itineraryDays.id, day.id)); await tx.update(restructuringProposals).set({ status: "undone", undoneAt: new Date() }).where(eq(restructuringProposals.id, input.proposalId)); await tx.insert(auditEvents).values({ tripId: input.tripId, actorId: user.id, action: "itinerary-restructured-undone", entityType: "restructuring", entityId: input.proposalId, details: JSON.stringify({ restored: true }) }); }); await invalidateTripCache(input.tripId); return { proposalId: input.proposalId, status: "undone" };
+}
+
+export async function listRestructuringHistory(tripId: string) { await member(tripId); if (!db) throw new Error("Database is not configured"); return db.query.restructuringProposals.findMany({ where: eq(restructuringProposals.tripId, tripId), orderBy: (row, { desc }) => [desc(row.createdAt)] }); }

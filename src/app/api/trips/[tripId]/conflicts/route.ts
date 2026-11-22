@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";
+import { listSyncConflicts, resolveSyncConflict } from "@/app/actions/money";
+export async function GET(_: Request, { params }: { params: Promise<{ tripId: string }> }) { try { const { tripId } = await params; return NextResponse.json({ conflicts: await listSyncConflicts(tripId) }); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load conflicts." }, { status: 400 }); } }
+export async function POST(request: Request, { params }: { params: Promise<{ tripId: string }> }) { try { const { tripId } = await params; return NextResponse.json(await resolveSyncConflict({ ...(await request.json()), tripId })); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to resolve conflict." }, { status: 400 }); } }
