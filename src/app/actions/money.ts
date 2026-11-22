@@ -112,18 +112,45 @@ export async function reverseExpense(input: { tripId: string; expenseId: string;
   return result;
 }
 
-async function calculateBalances(tripId: string) {
-  const [members, expenseRows, payments, shares, confirmedTransfers] = await Promise.all([
-    db!.query.participants.findMany({ where: eq(participants.tripId, tripId) }),
-    db!.query.expenses.findMany({ where: and(eq(expenses.tripId, tripId), isNull(expenses.reversedAt)) }),
-    db!.query.expensePayments.findMany(),
-    db!.query.expenseShares.findMany(),
-    db!.query.settlementTransfers.findMany({ where: and(eq(settlementTransfers.tripId, tripId), eq(settlementTransfers.status, "confirmed")) }),
-  ]);
-  const activeExpenseIds = new Set(expenseRows.map((expense) => expense.id));
+async function calculateBalances(
+  tripId: string,
+  preloaded?: {
+    members?: (typeof participants.$inferSelect)[];
+    expenseRows?: (typeof expenses.$inferSelect)[];
+    payments?: (typeof expensePayments.$inferSelect)[];
+    shares?: (typeof expenseShares.$inferSelect)[];
+    confirmedTransfers?: (typeof settlementTransfers.$inferSelect)[];
+  }
+) {
+  const members = preloaded?.members ?? await db!.query.participants.findMany({ where: eq(participants.tripId, tripId) });
+  const expenseRows = preloaded?.expenseRows ?? await db!.query.expenses.findMany({ where: and(eq(expenses.tripId, tripId), isNull(expenses.reversedAt)) });
+  const activeExpenseIds = expenseRows.map((expense) => expense.id);
+
+  let payments = preloaded?.payments;
+  let shares = preloaded?.shares;
+
+  if (!payments || !shares) {
+    if (activeExpenseIds.length === 0) {
+      payments = payments ?? [];
+      shares = shares ?? [];
+    } else {
+      const [fetchedPayments, fetchedShares] = await Promise.all([
+        payments ? Promise.resolve(payments) : db!.query.expensePayments.findMany({ where: inArray(expensePayments.expenseId, activeExpenseIds) }),
+        shares ? Promise.resolve(shares) : db!.query.expenseShares.findMany({ where: inArray(expenseShares.expenseId, activeExpenseIds) }),
+      ]);
+      payments = fetchedPayments;
+      shares = fetchedShares;
+    }
+  }
+
+  const confirmedTransfers = preloaded?.confirmedTransfers ?? await db!.query.settlementTransfers.findMany({
+    where: and(eq(settlementTransfers.tripId, tripId), eq(settlementTransfers.status, "confirmed")),
+  });
+
+  const activeExpenseSet = new Set(activeExpenseIds);
   const paid = new Map<string, number>(); const owed = new Map<string, number>();
-  for (const payment of payments) if (activeExpenseIds.has(payment.expenseId)) paid.set(payment.participantId, (paid.get(payment.participantId) || 0) + payment.amountPaise);
-  for (const share of shares) if (activeExpenseIds.has(share.expenseId)) owed.set(share.participantId, (owed.get(share.participantId) || 0) + share.amountPaise);
+  for (const payment of payments) if (activeExpenseSet.has(payment.expenseId)) paid.set(payment.participantId, (paid.get(payment.participantId) || 0) + payment.amountPaise);
+  for (const share of shares) if (activeExpenseSet.has(share.expenseId)) owed.set(share.participantId, (owed.get(share.participantId) || 0) + share.amountPaise);
   for (const transfer of confirmedTransfers) { paid.set(transfer.receiverId, (paid.get(transfer.receiverId) || 0) + transfer.amountPaise); paid.set(transfer.senderId, (paid.get(transfer.senderId) || 0) - transfer.amountPaise); }
   return members.map((participant) => ({ participantId: participant.id, name: participant.name, paidPaise: paid.get(participant.id) || 0, sharePaise: owed.get(participant.id) || 0, netPaise: (paid.get(participant.id) || 0) - (owed.get(participant.id) || 0) })).filter((item) => item.paidPaise || item.sharePaise || members.length);
 }
@@ -161,11 +188,9 @@ function minimumSuggestions(balances: { participantId: string; netPaise: number 
 
 export async function getMoneyOverview(tripId: string) {
   const { membership } = await requireMember(tripId); if (!db) throw new Error("Database is not configured");
-  const [expenseRows, payments, shares, balances, rules, rounds, transfers, trip, days, travelLegs, bikeRows, stayRows] = await Promise.all([
+  const [members, expenseRows, rules, rounds, transfers, trip, days, travelLegs, bikeRows, stayRows] = await Promise.all([
+    db.query.participants.findMany({ where: eq(participants.tripId, tripId) }),
     db.query.expenses.findMany({ where: eq(expenses.tripId, tripId), orderBy: (row, { desc }) => [desc(row.expenseDate), desc(row.createdAt)] }),
-    db.query.expensePayments.findMany(),
-    db.query.expenseShares.findMany(),
-    calculateBalances(tripId),
     db.query.budgetRules.findMany({ where: and(eq(budgetRules.tripId, tripId), eq(budgetRules.active, true)) }),
     db.query.settlementRounds.findMany({ where: eq(settlementRounds.tripId, tripId), orderBy: (row, { desc }) => [desc(row.createdAt)] }),
     db.query.settlementTransfers.findMany({ where: eq(settlementTransfers.tripId, tripId), orderBy: (row, { desc }) => [desc(row.createdAt)] }),
@@ -175,6 +200,22 @@ export async function getMoneyOverview(tripId: string) {
     db.query.bikes.findMany({ where: eq(bikes.tripId, tripId) }),
     db.query.activities.findMany({ where: and(eq(activities.tripId, tripId), eq(activities.type, "STAY"), eq(activities.archived, false)) }),
   ]);
+
+  const allExpenseIds = expenseRows.map((e) => e.id);
+  const [payments, shares] = allExpenseIds.length > 0 ? await Promise.all([
+    db.query.expensePayments.findMany({ where: inArray(expensePayments.expenseId, allExpenseIds) }),
+    db.query.expenseShares.findMany({ where: inArray(expenseShares.expenseId, allExpenseIds) }),
+  ]) : [[], []];
+
+  const activeExpenseRows = expenseRows.filter((e) => !e.reversedAt);
+  const confirmedTransfers = transfers.filter((t) => t.status === "confirmed");
+  const balances = await calculateBalances(tripId, {
+    members,
+    expenseRows: activeExpenseRows,
+    payments,
+    shares,
+    confirmedTransfers,
+  });
   const actualByCategory = new Map<string, number>();
   for (const row of expenseRows) if (!row.reversedAt) actualByCategory.set(row.category, (actualByCategory.get(row.category) || 0) + row.amountPaise);
   const bikeMap = new Map(bikeRows.map((bike) => [bike.id, bike]));

@@ -1,3 +1,464 @@
-.money-workspace{padding:45px 2px 20px}.money-heading{display:flex;justify-content:space-between;align-items:end;gap:12px}.money-heading h2{font:400 28px Georgia,serif;letter-spacing:-1px;margin:8px 0 5px}.money-heading p{color:#778178;font-size:12px;margin:0}.money-error{display:flex;gap:7px;align-items:center;background:#fae2dc;color:#983d26;border-radius:10px;padding:10px 12px;font-size:11px;margin-top:12px}.balance-strip{display:flex;gap:8px;overflow:auto;margin:22px 0 12px;padding-bottom:4px}.balance-chip{min-width:130px;background:#e3f0e6;border-radius:13px;padding:10px}.balance-chip span,.balance-chip b{display:block}.balance-chip span{font-size:10px;color:#285f48}.balance-chip b{font-size:12px;margin-top:5px}.positive{color:#285f48}.negative{color:#a34e2c}.ledger-card{background:#fffefa;border:1px solid #e6e9e1;border-radius:19px;padding:16px}.ledger-header{display:flex;justify-content:space-between;align-items:end;margin-bottom:8px}.ledger-header h3{font:400 20px Georgia,serif;margin:7px 0}.filter-control{display:flex;align-items:center;gap:5px;color:#778178}.filter-control select{border:0;background:transparent;font-size:10px;color:#778178}.ledger-row{display:flex;align-items:center;gap:10px;border-top:1px solid #edf0eb;padding:13px 0}.ledger-row.reversed{opacity:.55}.ledger-icon{display:grid;place-items:center;width:30px;height:30px;background:#e3f0e6;color:#285f48;border-radius:9px}.ledger-copy{display:flex;flex-direction:column;gap:4px;flex:1}.ledger-copy b{font-size:12px}.ledger-copy small{font-size:10px;color:#778178}.ledger-row>strong{font-size:12px}.reversed-label{font-size:9px;color:#983d26}.ledger-empty{text-align:center;color:#778178;font-size:12px;padding:28px 8px}.expense-sheet{width:min(100%,620px);max-height:92svh;overflow:auto;margin:auto;background:#fffefa;border-radius:26px 26px 0 0;padding:22px 20px 32px}.amount-input{width:100%;border:0;border-bottom:2px solid #285f48;background:transparent;font:400 42px Georgia,serif;outline:0;padding:12px 0;margin:16px 0}.expense-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.expense-fields input,.expense-fields select,.field-label select,.split-heading select{width:100%;border:1px solid #dfe5dc;background:#fff;border-radius:10px;padding:10px;font-size:11px}.expense-fields input:first-child{grid-column:1/-1}.field-label{display:grid;gap:7px;color:#778178;font-size:10px;font-weight:bold;margin-top:15px}.split-heading{display:flex;justify-content:space-between;align-items:center;margin-top:16px}.split-heading select{width:auto}.person-split{display:flex;align-items:center;gap:8px;border-top:1px solid #edf0eb;padding:10px 0;font-size:12px}.person-split>span{flex:1}.split-input{width:78px;border:1px solid #dfe5dc;border-radius:8px;padding:6px;font-size:11px}.assigned{display:flex;justify-content:space-between;background:#fff4d7;color:#795d1c;border-radius:9px;padding:10px;font-size:11px;margin:12px 0}.assigned.good{background:#e3f0e6;color:#285f48}@media(max-width:540px){.money-heading{align-items:start;flex-direction:column}.expense-fields{grid-template-columns:1fr}.expense-fields input:first-child{grid-column:auto}}
-.category-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0}.category-card,.stay-option{border:1px solid #e6e9e1;background:#fffefa;color:#526057;border-radius:12px;padding:11px 7px;font-size:11px;font-weight:700}.category-card.selected,.stay-option.selected{border-color:#285f48;background:#e3f0e6;color:#285f48}.stay-options{margin:15px 0}.stay-options>div{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}.stay-option{padding:9px 12px}@media(max-width:430px){.category-grid{grid-template-columns:repeat(2,1fr)}}
-.money-settlement-workspace{padding-bottom:100px}.money-settlement-divider{display:flex;align-items:center;gap:10px;margin:8px 2px 0;color:#778178;font-size:9px;font-weight:800;letter-spacing:1.3px}.money-settlement-divider i{height:1px;background:#e6e9e1;flex:1}.expense-sheet{animation:sheet-up .42s cubic-bezier(.2,.8,.2,1) both}.sheet-backdrop{animation:sheet-fade .25s ease both}@keyframes sheet-up{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}@keyframes sheet-fade{from{opacity:0}to{opacity:1}}.balance-strip:empty{min-height:43px}.balance-strip:empty:before,.settlement-balance:empty:before{content:"Loading shared balances…";display:block;width:100%;height:16px;border-radius:8px;background:linear-gradient(90deg,#e3f0e6 25%,#eef4ee 50%,#e3f0e6 75%);background-size:200% 100%;color:#778178;font-size:10px;padding:10px;animation:shimmer 1.4s ease-in-out infinite}@keyframes shimmer{to{background-position:-200% 0}}
+.money-workspace {
+  padding: 45px 2px 20px
+}
+
+.money-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 12px
+}
+
+.money-heading h2 {
+  font: 400 28px "SF Pro Display", -apple-system, BlinkMacSystemFont, "SF Pro", "San Francisco", sans-serif;
+  letter-spacing: -1px;
+  margin: 8px 0 5px
+}
+
+.money-heading p {
+  color: #778178;
+  font-size: 12px;
+  margin: 0
+}
+
+.money-error {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  background: #fae2dc;
+  color: #983d26;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 11px;
+  margin-top: 12px
+}
+
+.balance-strip {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  margin: 22px 0 12px;
+  padding-bottom: 4px
+}
+
+.balance-chip {
+  min-width: 130px;
+  background: #e3f0e6;
+  border-radius: 13px;
+  padding: 10px
+}
+
+.balance-chip span,
+.balance-chip b {
+  display: block
+}
+
+.balance-chip span {
+  font-size: 10px;
+  color: #285f48
+}
+
+.balance-chip b {
+  font-size: 12px;
+  margin-top: 5px
+}
+
+.positive {
+  color: #285f48
+}
+
+.negative {
+  color: #a34e2c
+}
+
+.ledger-card {
+  background: #fffefa;
+  border: 1px solid #e6e9e1;
+  border-radius: 19px;
+  padding: 16px
+}
+
+.ledger-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-bottom: 8px
+}
+
+.ledger-header h3 {
+  font: 400 20px "SF Pro Display", -apple-system, BlinkMacSystemFont, "SF Pro", "San Francisco", sans-serif;
+  margin: 7px 0
+}
+
+.filter-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #778178
+}
+
+.filter-control select {
+  border: 0;
+  background: transparent;
+  font-size: 10px;
+  color: #778178
+}
+
+.ledger-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #edf0eb;
+  padding: 13px 0
+}
+
+.ledger-row.reversed {
+  opacity: .55
+}
+
+.ledger-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: #e3f0e6;
+  color: #285f48;
+  border-radius: 9px
+}
+
+.ledger-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1
+}
+
+.ledger-copy b {
+  font-size: 12px
+}
+
+.ledger-copy small {
+  font-size: 10px;
+  color: #778178
+}
+
+.ledger-row>strong {
+  font-size: 12px
+}
+
+.reversed-label {
+  font-size: 9px;
+  color: #983d26
+}
+
+.ledger-empty {
+  text-align: center;
+  color: #778178;
+  font-size: 12px;
+  padding: 28px 8px
+}
+
+.expense-sheet {
+  width: min(92vw, 430px);
+  max-height: 85svh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  margin: auto;
+  background: #fffefa;
+  border-radius: 24px;
+  padding: 20px 18px 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(0, 0, 0, 0.06)
+}
+
+.expense-sheet::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0
+}
+
+.amount-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 2px solid #285f48;
+  background: transparent;
+  font: 400 32px "SF Pro Display", -apple-system, BlinkMacSystemFont, "SF Pro", "San Francisco", sans-serif;
+  outline: 0;
+  padding: 6px 0;
+  margin: 6px 0 12px
+}
+
+.expense-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px
+}
+
+.expense-fields input,
+.expense-fields select,
+.field-label select,
+.split-heading select {
+  width: 100%;
+  border: 1px solid #dfe5dc;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 11px
+}
+
+.expense-fields input:first-child {
+  grid-column: 1/-1
+}
+
+.field-label {
+  display: grid;
+  gap: 5px;
+  color: #778178;
+  font-size: 10px;
+  font-weight: bold;
+  margin-top: 10px
+}
+
+.payer-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px
+}
+
+.payer-heading .small-button {
+  border: 1px solid #dfe5dc;
+  background: transparent;
+  color: #285f48;
+  border-radius: 100px;
+  padding: 4px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer
+}
+
+.payer-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px
+}
+
+.payer-row select {
+  flex: 1;
+  border: 1px solid #dfe5dc;
+  border-radius: 9px;
+  background: #fff;
+  padding: 7px 9px;
+  font-size: 11px
+}
+
+.payer-row input {
+  width: 105px;
+  border: 1px solid #dfe5dc;
+  border-radius: 9px;
+  background: #fff;
+  padding: 7px 9px;
+  font-size: 11px
+}
+
+.split-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px
+}
+
+.split-heading select {
+  width: auto;
+  padding: 5px 8px;
+  font-size: 10.5px
+}
+
+.person-split {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid #edf0eb;
+  padding: 7px 0;
+  font-size: 11.5px;
+  cursor: pointer
+}
+
+.person-split input[type="checkbox"] {
+  accent-color: #285f48;
+  width: 15px;
+  height: 15px
+}
+
+.person-split>span {
+  flex: 1
+}
+
+.split-input {
+  width: 78px;
+  border: 1px solid #dfe5dc;
+  border-radius: 8px;
+  padding: 6px;
+  font-size: 11px
+}
+
+.assigned {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff4d7;
+  color: #795d1c;
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 10.5px;
+  margin: 10px 0
+}
+
+.assigned.good {
+  background: #e3f0e6;
+  color: #285f48
+}
+
+@media(max-width:540px) {
+  .money-heading {
+    align-items: start;
+    flex-direction: column
+  }
+
+  .expense-fields {
+    grid-template-columns: 1fr
+  }
+
+  .expense-fields input:first-child {
+    grid-column: auto
+  }
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 10px 0 12px
+}
+
+.category-card,
+.stay-option {
+  border: 1px solid #e6e9e1;
+  background: #fffefa;
+  color: #526057;
+  border-radius: 10px;
+  padding: 8px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center
+}
+
+.category-card.selected,
+.stay-option.selected {
+  border-color: #285f48;
+  background: #e3f0e6;
+  color: #285f48
+}
+
+.stay-options {
+  margin: 12px 0
+}
+
+.stay-options>div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px
+}
+
+.stay-option {
+  padding: 7px 10px;
+  font-size: 11px
+}
+
+@media(max-width:340px) {
+  .category-grid {
+    grid-template-columns: repeat(2, 1fr)
+  }
+}
+
+.money-settlement-workspace {
+  padding-bottom: 100px
+}
+
+.money-settlement-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 2px 0;
+  color: #778178;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.3px
+}
+
+.money-settlement-divider i {
+  height: 1px;
+  background: #e6e9e1;
+  flex: 1
+}
+
+.expense-sheet {
+  animation: sheet-up .35s cubic-bezier(.16, 1, .3, 1) both
+}
+
+.sheet-backdrop {
+  animation: sheet-fade .2s ease both
+}
+
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px)
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0)
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0
+  }
+
+  to {
+    opacity: 1
+  }
+}
+
+.balance-strip:empty {
+  min-height: 43px
+}
+
+.balance-strip:empty:before,
+.settlement-balance:empty:before {
+  content: "Loading shared balances…";
+  display: block;
+  width: 100%;
+  height: 16px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e3f0e6 25%, #eef4ee 50%, #e3f0e6 75%);
+  background-size: 200% 100%;
+  color: #778178;
+  font-size: 10px;
+  padding: 10px;
+  animation: shimmer 1.4s ease-in-out infinite
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0
+  }
+}

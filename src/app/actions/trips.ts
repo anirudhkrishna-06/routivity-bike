@@ -32,7 +32,13 @@ function overlaps(aStart?: string | null, aEnd?: string | null, bStart?: string 
   return Boolean(aStart && aEnd && bStart && bEnd && aStart < bEnd && bStart < aEnd);
 }
 async function ensureNoOverlap(tx: Tx, tripId: string, dayId: string, startTime?: string | null, endTime?: string | null, exceptId?: string) {
-  const existing = await tx.select().from(activities).where(and(eq(activities.tripId, tripId), eq(activities.dayId, dayId), eq(activities.archived, false)));
+  if (!startTime || !endTime) return;
+  const existing = await tx.select({
+    id: activities.id,
+    title: activities.title,
+    startTime: activities.startTime,
+    endTime: activities.endTime,
+  }).from(activities).where(and(eq(activities.tripId, tripId), eq(activities.dayId, dayId), eq(activities.archived, false)));
   const conflict = existing.find((item) => item.id !== exceptId && overlaps(startTime, endTime, item.startTime, item.endTime));
   if (conflict) throw new Error("OVERLAP:" + conflict.id + ":" + conflict.title);
 }
@@ -43,12 +49,20 @@ async function participantRows(tx: Tx, tripId: string, members: { name: string; 
   const selectedName = ownerMemberName?.trim().toLowerCase();
   const selectedIndex = members.findIndex((item) => selectedName && item.name.trim().toLowerCase() === selectedName);
   const ownerInMembers = selectedIndex >= 0 || members.some((item) => item.email?.trim().toLowerCase() === owner.email.toLowerCase());
+
+  const emails = Array.from(new Set(members.map((item) => item.email?.trim().toLowerCase()).filter((e): e is string => Boolean(e))));
+  const userMap = new Map<string, string>();
+  if (emails.length) {
+    const matched = await tx.select({ id: users.id, email: users.email }).from(users).where(inArray(users.email, emails));
+    for (const u of matched) userMap.set(u.email.toLowerCase(), u.id);
+  }
+
   const rows: { tripId: string; name: string; email?: string; userId: string | null; role: "owner" | "member" }[] = [];
   for (const item of members) {
     const email = item.email?.trim().toLowerCase();
     const isOwnerMember = (selectedName && item.name.trim().toLowerCase() === selectedName) || (email && email === owner.email.toLowerCase()) || (!ownerMemberName && item.name.trim().toLowerCase() === owner.name.trim().toLowerCase());
-    const linked = email ? await tx.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1) : [];
-    rows.push({ tripId, name: item.name.trim(), email, userId: isOwnerMember ? owner.id : linked[0]?.id ?? null, role: isOwnerMember ? "owner" : "member" });
+    const linkedId = email ? userMap.get(email) ?? null : null;
+    rows.push({ tripId, name: item.name.trim(), email, userId: isOwnerMember ? owner.id : linkedId, role: isOwnerMember ? "owner" : "member" });
   }
   if (!ownerInMembers) rows.unshift({ tripId, name: owner.name, email: owner.email, userId: owner.id, role: "owner" });
   return rows;

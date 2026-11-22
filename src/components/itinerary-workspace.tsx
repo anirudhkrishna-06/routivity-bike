@@ -8,9 +8,44 @@ type Activity = { id: string; dayNumber: number; date: string; type: string; tit
 
 export function ItineraryWorkspace({ tripId }: { tripId: string }) {
   const [activities, setActivities] = useState<Activity[]>([]); const [selectedDay, setSelectedDay] = useState(1); const [message, setMessage] = useState("Loading your saved itinerary…");
-  async function load() { const response = await fetch(`/api/trips/${tripId}/activities`, { cache: "no-store" }); const body = await response.json() as { activities?: Activity[]; error?: string }; if (!response.ok) { setMessage(body.error || "Unable to load itinerary."); return; } const next = body.activities || []; setActivities(next); setSelectedDay(Number(next[0]?.dayNumber) || 1); setMessage(next.length ? "Your itinerary is saved and shared with the trip." : "No activities have been added yet."); }
+  const cacheKey = `routivity-itinerary-${tripId}`;
+  async function load() {
+    try {
+      const response = await fetch(`/api/trips/${tripId}/activities`, { cache: "no-store" });
+      const body = await response.json() as { activities?: Activity[]; error?: string };
+      if (!response.ok) throw new Error(body.error || "Unable to load itinerary.");
+      const next = body.activities || [];
+      setActivities(next);
+      setSelectedDay(Number(next[0]?.dayNumber) || 1);
+      window.localStorage.setItem(cacheKey, JSON.stringify(next));
+      setMessage(next.length ? "Your itinerary is saved and shared with the trip." : "No activities have been added yet.");
+    } catch (caught) {
+      const cached = window.localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const next = JSON.parse(cached) as Activity[];
+          setActivities(next);
+          setSelectedDay(Number(next[0]?.dayNumber) || 1);
+          setMessage("Viewing cached itinerary (offline).");
+          return;
+        } catch {}
+      }
+      setMessage(caught instanceof Error ? caught.message : "Unable to load itinerary.");
+    }
+  }
   // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
-  useEffect(() => { void load(); }, [tripId]);
+  useEffect(() => {
+    const cached = window.localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const next = JSON.parse(cached) as Activity[];
+        setActivities(next);
+        setSelectedDay(Number(next[0]?.dayNumber) || 1);
+        setMessage("Your itinerary is saved and shared with the trip.");
+      } catch {}
+    }
+    void load();
+  }, [tripId]);
   const days = useMemo(() => Array.from(new Set(activities.map((a) => a.dayNumber))).sort((a, b) => a - b), [activities]); const dayActivities = activities.filter((activity) => activity.dayNumber === selectedDay).sort((a, b) => a.sortOrder - b.sortOrder);
   function exportCurrent() { const rows = activities.map((activity) => ({ record_type: "ACTIVITY", day_number: String(activity.dayNumber), date: activity.date, activity_type: activity.type, title: activity.title, start_time: activity.startTime || "", origin: activity.origin || "", destination: activity.destination || "", location: activity.location || "", maps_url: activity.mapsUrl || "", status: activity.status } as CsvRow)); const blob = new Blob([exportItinerary(rows)], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "routivity-itinerary.csv"; link.click(); URL.revokeObjectURL(url); }
   return <section className="itinerary-workspace rise-in"><div className="itinerary-heading"><div><span className="section-label">ITINERARY</span><h2>Your saved journey</h2><p>{message}</p></div><div className="itinerary-actions"><button className="small-button" onClick={() => void load()}><RefreshCw size={15}/> Refresh</button>{activities.length > 0 && <button className="small-button primary-small" onClick={exportCurrent}><Download size={15}/> Export</button>}</div></div>{activities.length > 0 && <div className="itinerary-list"><div className="day-tabs">{days.map((day, dayIndex) => <button className={selectedDay === day ? "day-tab active" : "day-tab"} key={`day-${day}-${dayIndex}`} onClick={() => setSelectedDay(day)}><span>DAY {day}</span><b>{activities.find((a) => a.dayNumber === day)?.date}</b></button>)}</div>{dayActivities.map((activity, activityIndex) => <article className="activity-item" key={`${activity.id || "activity"}-${activity.dayNumber}-${activityIndex}`}><div className="activity-time">{activity.startTime || "—"}<i/></div><div className="activity-detail"><div className="activity-type">{activity.type}</div><h3>{activity.title}</h3><p>{activity.origin && activity.destination ? `${activity.origin} → ${activity.destination}` : activity.location || "No location added"}</p>{activity.mapsUrl && <a href={activity.mapsUrl} target="_blank" rel="noopener noreferrer"><MapPin size={13}/> Open in Maps</a>}<div className="activity-controls"><span className={activity.status === "done" ? "state done" : "state"}>{activity.status}</span></div></div></article>)}</div>}</section>;

@@ -133,21 +133,30 @@ export const expenses = pgTable("expenses", {
   reversalReason: text("reversal_reason"),
   version: integer("version").default(1).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  tripIdx: index("expenses_trip_idx").on(table.tripId),
+  dateIdx: index("expenses_trip_date_idx").on(table.tripId, table.expenseDate),
+}));
 
 export const expensePayments = pgTable("expense_payments", {
   id: uuid("id").defaultRandom().primaryKey(),
   expenseId: uuid("expense_id").references(() => expenses.id).notNull(),
   participantId: uuid("participant_id").references(() => participants.id).notNull(),
   amountPaise: integer("amount_paise").notNull(),
-});
+}, (table) => ({
+  expenseIdx: index("expense_payments_expense_idx").on(table.expenseId),
+  participantIdx: index("expense_payments_participant_idx").on(table.participantId),
+}));
 
 export const expenseShares = pgTable("expense_shares", {
   id: uuid("id").defaultRandom().primaryKey(),
   expenseId: uuid("expense_id").references(() => expenses.id).notNull(),
   participantId: uuid("participant_id").references(() => participants.id).notNull(),
   amountPaise: integer("amount_paise").notNull(),
-});
+}, (table) => ({
+  expenseIdx: index("expense_shares_expense_idx").on(table.expenseId),
+  participantIdx: index("expense_shares_participant_idx").on(table.participantId),
+}));
 
 export const expenseRevisions = pgTable("expense_revisions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -170,7 +179,9 @@ export const budgetRules = pgTable("budget_rules", {
   active: boolean("active").default(true).notNull(),
   createdBy: uuid("created_by").references(() => users.id).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  tripActiveIdx: index("budget_rules_trip_active_idx").on(table.tripId, table.active),
+}));
 
 export const budgetRuleHistory = pgTable("budget_rule_history", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -205,7 +216,10 @@ export const settlementTransfers = pgTable("settlement_transfers", {
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   reversalReason: text("reversal_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  tripIdx: index("settlement_transfers_trip_idx").on(table.tripId),
+  roundIdx: index("settlement_transfers_round_idx").on(table.roundId),
+}));
 
 export const auditEvents = pgTable("audit_events", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -216,7 +230,9 @@ export const auditEvents = pgTable("audit_events", {
   entityId: uuid("entity_id").notNull(),
   details: text("details").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => ({
+  tripCreatedIdx: index("audit_events_trip_created_idx").on(table.tripId, table.createdAt),
+}));
 
 export const mutations = pgTable("mutations", {
   id: uuid("id").defaultRandom().primaryKey(),

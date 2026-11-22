@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { createExpense, editExpense, getMoneyOverview, reverseExpense } from "@/app/actions/money";
+import { getOrSetCache } from "@/lib/cache";
 
 export async function GET(_: Request, { params }: { params: Promise<{ tripId: string }> }) {
-  try { const { tripId } = await params; return NextResponse.json(await getMoneyOverview(tripId)); }
-  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load money data." }, { status: 400 }); }
+  try {
+    const { tripId } = await params;
+    const overview = await getOrSetCache(`trip:${tripId}:money`, 300, async () => {
+      return getMoneyOverview(tripId);
+    });
+    return NextResponse.json(overview);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to load money data." }, { status: 400 });
+  }
 }
 export async function POST(request: Request, { params }: { params: Promise<{ tripId: string }> }) {
   try {

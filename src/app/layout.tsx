@@ -34,5 +34,12 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body><OfflineBanner />{children}</body></html>;
+  return (
+    <html lang="en">
+      <head>
+        <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/sf-pro-display" />
+      </head>
+      <body><OfflineBanner />{children}</body>
+    </html>
+  );
 }
