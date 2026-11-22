@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Pencil, Plus, TrendingDown, TrendingUp } from "lucide-react";

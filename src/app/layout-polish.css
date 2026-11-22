@@ -78,3 +78,60 @@ html[data-theme="dark"] .join-candidate.selected { background: #254333; }
   .analytics-actions-bottom { margin-top: 18px; }
   .analytics-action-card { min-height: 50px; }
 }
+
+/* All Trips editorial landing screen */
+.all-trips { background: #F5F3ED; color: #161B18; }
+.all-trips .app-frame { width: min(100%, 760px); padding: 24px 24px 70px; position: relative; z-index: 1; }
+.all-trips .topbar { min-height: 42px; }
+.all-trips .top-actions { gap: 10px; }
+.theme-circle, .hub-avatar { width: 42px; height: 42px; border-radius: 9999px; display: grid; place-items: center; border: 1px solid rgba(22,27,24,.1); }
+.theme-circle { position: relative; overflow: hidden; background: rgba(255,255,255,.48); color: #161B18; backdrop-filter: blur(12px); }
+.theme-icon { position: absolute; display: grid; place-items: center; opacity: 0; transform: rotate(-90deg) scale(.7); transition: opacity .28s ease, transform .28s ease; }
+.theme-icon-visible { opacity: 1; transform: rotate(0) scale(1); }
+.hub-avatar { background: #DCE8E0; color: #1B4D3E; box-shadow: inset 0 0 0 1px rgba(27,77,62,.14); }
+.all-trips-hub { position: relative; padding: clamp(32px, 6.5vh, 60px) 0 24px; }
+.hub-ambient { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.hub-orb { position: absolute; width: 260px; height: 260px; border-radius: 50%; filter: blur(90px); opacity: .14; }
+.hub-orb-warm { top: 2%; left: -12%; background: #BA442F; }
+.hub-orb-sage { top: 28%; right: -15%; background: #4E9B76; }
+.hub-map { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.hub-contours { fill: none; stroke: #1B4D3E; stroke-width: 1; opacity: .07; }
+.hub-route { fill: none; stroke: #2D9CDB; stroke-width: 1.2; stroke-dasharray: 4 6; opacity: .28; }
+.hub-crosshairs { fill: none; stroke: #5F7167; stroke-width: 1; opacity: .22; }
+.hub-waypoints { fill: #2D9CDB; filter: drop-shadow(0 0 4px #2D9CDB); opacity: .75; transform-box: fill-box; transform-origin: center; }
+.hub-hero { display: flex; justify-content: center; align-items: center; position: relative; z-index: 1; }
+.hub-hero-logo { width: var(--hero-logo-width, clamp(210px, 54vw, 290px)); height: auto; object-fit: contain; }
+.all-trips .hub-action-grid { max-width: 410px; width: 100%; margin: 28px auto 44px; grid-template-columns: 1fr 1fr; gap: 12px; }
+.all-trips .hub-action-card { height: 54px; min-height: 54px; border-radius: 18px; padding: 0 18px; justify-content: center; gap: 10px; box-shadow: none; transition: transform .2s ease, filter .2s ease; }
+.all-trips .hub-action-card:hover { transform: translateY(-1.5px); filter: brightness(1.05); box-shadow: none; }
+.all-trips .hub-action-card:active { transform: scale(.98); }
+.all-trips .hub-action-card.add { background: linear-gradient(135deg,#BA442F 0%,#9E3320 100%); box-shadow: 0 10px 24px -8px rgba(178,63,43,.45); }
+.all-trips .hub-action-card.join { background: #18201C; }
+.all-trips .hub-action-card i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; }
+.all-trips .hub-action-card.add i { background: rgba(255,255,255,.16); }
+.all-trips .hub-action-card.join i { background: rgba(126,212,166,.14); color: #9FB6A8; }
+.all-trips .hub-action-card b { color: #fff; font-size: 13px; letter-spacing: .07em; }
+.all-trips .trip-card-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,410px),1fr)); gap: 14px; max-width: 680px; margin: 0 auto; }
+.all-trips .trip-hub-card { position: relative; overflow: hidden; min-height: 0; padding: 20px; border-radius: 22px; background: #FCFBF8; border: 1px solid rgba(22,27,24,.08); box-shadow: 0 16px 35px rgba(46,52,44,.08); }
+.trip-card-watermark { position: absolute; top: 0; right: 0; width: 150px; height: 110px; fill: none; stroke: #1B4D3E; stroke-width: 1; opacity: .06; pointer-events: none; }
+.all-trips .trip-card-line { position: relative; z-index: 1; }
+.all-trips .trip-status { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; background: rgba(180,118,16,.10); color: #9A6308; font-size: 10px; letter-spacing: 0; font-weight:200; }
+.all-trips .trip-status b { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(180,118,16,.12); }
+.all-trips .trip-hub-card h2 { position: relative; z-index: 1; margin: 17px 0 0; font-size: clamp(15px,3vw,21px); font-weight: 400; line-height: 1.32; letter-spacing: -.015em; }
+.all-trips .trip-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(22,27,24,.12); }
+.all-trips .trip-hub-card p { margin: 0; color: #636B66; }
+.all-trips .open-trip { margin: 0 0 0 auto; padding: 7px 10px; border-radius: 9999px; background: rgba(27,94,67,.09); color: #1B5E43; font-size: 11px; }
+.all-trips .app-frame:has(.all-trips-hub) { overflow: visible; }
+html[data-theme="dark"] .all-trips { background: #0F1412; color: #F3F2ED; }
+html[data-theme="dark"] .all-trips .hub-orb { opacity: .18; }
+html[data-theme="dark"] .all-trips .hub-contours { stroke: #D6E8DC; opacity: .09; }
+html[data-theme="dark"] .theme-circle { background: rgba(255,255,255,.1); color: #F3F2ED; border-color: rgba(255,255,255,.14); }
+html[data-theme="dark"] .hub-avatar { background: #1A2B23; color: #7ED4A6; box-shadow: inset 0 0 0 1px rgba(126,212,166,.16); }
+html[data-theme="dark"] .all-trips .hub-action-card.join { background: #1D2622; border: 1px solid rgba(255,255,255,.09); }
+html[data-theme="dark"] .all-trips .trip-hub-card { background: #161D1A; border-color: rgba(255,255,255,.08); box-shadow: none; }
+html[data-theme="dark"] .trip-card-watermark { stroke: #D6E8DC; opacity: .08; }
+html[data-theme="dark"] .all-trips .trip-status { background: rgba(224,164,56,.14); color: #E5AD44; }
+html[data-theme="dark"] .all-trips .trip-card-footer { border-color: rgba(255,255,255,.1); }
+html[data-theme="dark"] .all-trips .trip-hub-card p { color: #94A099; }
+html[data-theme="dark"] .all-trips .open-trip { background: rgba(111,207,151,.12); color: #6FCF97; }
+@media (max-width: 520px) { .all-trips .app-frame { padding-left: 18px; padding-right: 18px; } .all-trips-hub { padding-top: 34px; } .all-trips .hub-action-grid { margin-bottom: 34px; } }

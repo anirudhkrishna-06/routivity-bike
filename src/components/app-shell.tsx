@@ -2,9 +2,10 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BarChart3, CalendarDays, CircleDollarSign, LogOut, Plus, WalletCards } from "lucide-react";
+import { ArrowLeft, BarChart3, CalendarDays, CircleDollarSign, LogOut, Moon, Plus, Sun, UserRound, WalletCards } from "lucide-react";
+import gsap from "gsap";
 import { ItineraryWorkspace } from "./itinerary-workspace";
 import { ItineraryTools } from "./scheduling-panel";
 import { FuelIntelligence } from "./fuel-intelligence";
@@ -32,8 +33,22 @@ export function AppShell({ user, trips, initialTripId }: Props) {
   const [selectedTripId, setSelectedTripId] = useState(initialTripId && trips.some((trip) => trip.id === initialTripId) ? initialTripId : undefined);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
   const [expenseCategory, setExpenseCategory] = useState<string | undefined>();
+  const hubRef = useRef<HTMLElement>(null);
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId);
   const dark = mounted ? resolvedDark(theme) : false;
+
+  useEffect(() => {
+    if (selectedTrip || !hubRef.current) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ctx = gsap.context(() => {
+      if (reduced) { gsap.set(".hub-entrance", { opacity: 1, y: 0 }); return; }
+      gsap.fromTo(".hub-entrance", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.65, stagger: 0.08, ease: "power3.out" });
+      gsap.to(".hub-route", { strokeDashoffset: -180, duration: 20, repeat: -1, ease: "none" });
+      gsap.to(".hub-contour, .hub-orb", { y: 10, rotation: 1.2, duration: 9, repeat: -1, yoyo: true, ease: "sine.inOut", stagger: 0.15 });
+      gsap.to(".hub-waypoint", { scale: 1.35, opacity: 0.9, duration: 2.4, repeat: -1, yoyo: true, ease: "sine.inOut", stagger: 0.4 });
+    }, hubRef);
+    return () => ctx.revert();
+  }, [selectedTrip]);
 
   useEffect(() => {
     setMounted(true);
@@ -110,8 +125,15 @@ export function AppShell({ user, trips, initialTripId }: Props) {
     go("Trip Now");
   }
 
+  function toggleTheme() {
+    const next = dark ? "light" : "dark";
+    window.localStorage.setItem("routivity-theme", next);
+    setTheme(next);
+    document.documentElement.dataset.theme = next;
+  }
+
   return (
-    <main className={dark ? "app dark" : "app"}>
+    <main className={`${dark ? "app dark" : "app"}${selectedTrip ? "" : " all-trips"}`}>
       <div className="app-frame">
         <header className="topbar">
           {selectedTrip && (
@@ -124,7 +146,7 @@ export function AppShell({ user, trips, initialTripId }: Props) {
               <ArrowLeft size={18} />
             </button>
           )}
-          <button className="brand-home" onClick={goToAllTrips} aria-label="Back to all trips">
+          {selectedTrip && <button className="brand-home" onClick={goToAllTrips} aria-label="Back to all trips">
             <Image
               src={dark ? "/dark-mode-logo.png" : "/logo.png"}
               alt="Routivity"
@@ -132,21 +154,25 @@ export function AppShell({ user, trips, initialTripId }: Props) {
               height={41}
               priority
             />
-          </button>
+          </button>}
           <div className="top-actions">
+            {!selectedTrip && <button className="theme-circle" onClick={toggleTheme} aria-label={`Switch to ${dark ? "light" : "dark"} mode`}>
+              <span className={dark ? "theme-icon" : "theme-icon theme-icon-visible"}><Sun size={18} /></span>
+              <span className={dark ? "theme-icon theme-icon-visible" : "theme-icon"}><Moon size={18} /></span>
+            </button>}
             <button
-              className="avatar"
+              className={selectedTrip ? "avatar" : "avatar hub-avatar"}
               onClick={() => setProfileOpen((open) => !open)}
               aria-label="Open profile menu"
             >
-              {user.name.slice(0, 2).toUpperCase()}
+              {selectedTrip ? user.name.slice(0, 2).toUpperCase() : <UserRound size={18} strokeWidth={1.8} />}
             </button>
             {profileOpen && (
               <div className="profile-menu">
                 <strong>{user.name}</strong>
                 <span>{user.email}</span>
                 <button onClick={() => void signOut()}>
-                  <LogOut size={15} /> Log out
+                  <LogOut size={12} /> Log out
                 </button>
               </div>
             )}
@@ -154,17 +180,22 @@ export function AppShell({ user, trips, initialTripId }: Props) {
         </header>
 
         {!selectedTrip ? (
-          <section className="trip-hub rise-in">
-            <div className="hub-heading">
-              <div>
-                
-                <h1>Where are you going?</h1>
-                <p>Select a trip to open its live dashboard, itinerary, money, and shared settings.</p>
-              </div>
+          <section className="trip-hub all-trips-hub" ref={hubRef}>
+            <div className="hub-ambient" aria-hidden="true">
+              <span className="hub-orb hub-orb-warm" /><span className="hub-orb hub-orb-sage" />
+              <svg className="hub-map" viewBox="0 0 760 700" preserveAspectRatio="none">
+                <g className="hub-contours"><path d="M20 145c92-66 151-12 192 31s82 44 121 4" /><path d="M20 166c89-61 142-11 184 30s87 50 130 5" /><path d="M20 188c83-52 132-11 177 29s90 51 139 8" /><path d="M520 505c71-70 117-32 151 7s55 43 91 15" /></g>
+                <path className="hub-route" d="M-20 387 C 140 510, 208 452, 300 330 S 475 125, 780 237" />
+                <g className="hub-crosshairs"><path d="M54 195h12m-6-6v12M704 190h12m-6-6v12M61 530h12m-6-6v12M688 498h12m-6-6v12M380 146h12m-6-6v12" /></g>
+                <g className="hub-waypoints"><circle cx="216" cy="452" r="3" /><circle cx="552" cy="164" r="3" /></g>
+              </svg>
+            </div>
+            <div className="hub-hero hub-entrance">
+              <Image className="hub-hero-logo" src={dark ? "/dark-mode-logo.png" : "/logo.png"} alt="routivity.ai" width={420} height={152} priority />
             </div>
             <div className="hub-action-grid">
-              <Link className="hub-action-card add" href="/trips/new"><Plus size={18}/><span><b>ADD</b></span></Link>
-              <Link className="hub-action-card join" href="/join"><ArrowLeft size={18}/><span><b>JOIN</b></span></Link>
+              <Link className="hub-action-card add hub-entrance" href="/trips/new"><i><Plus size={15}/></i><span><b>ADD</b></span></Link>
+              <Link className="hub-action-card join hub-entrance" href="/join"><i><ArrowLeft size={15}/></i><span><b>JOIN</b></span></Link>
             </div>
             {trips.length === 0 ? (
               <div className="empty-trip">
@@ -180,17 +211,20 @@ export function AppShell({ user, trips, initialTripId }: Props) {
                 {trips.map((trip) => {
                   const status = tripStatus(trip);
                   return (
-                    <article className="trip-hub-card" key={trip.id}>
+                    <article className="trip-hub-card hub-entrance" key={trip.id}>
+                      <svg className="trip-card-watermark" viewBox="0 0 150 110" aria-hidden="true"><path d="M-12 71c33-42 68-31 84-6s32 30 78-12" /><path d="M-8 89c35-42 64-26 81-2s36 27 80-11" /></svg>
                       <div className="trip-card-line">
-                        <span className={`trip-status ${status.toLowerCase()}`}>{status}</span>
+                        <span className={`trip-status ${status.toLowerCase()}`}><b />{status}</span>
                       </div>
                       <h2>{trip.name}</h2>
+                      <div className="trip-card-footer">
                       <p>
                         <CalendarDays size={14} /> {date(trip.startDate)} – {date(trip.endDate)}
                       </p>
                       <button className="open-trip" onClick={() => selectTrip(trip.id)}>
-                        Open dashboard <span>↗</span>
+                        Open<span>↗</span>
                       </button>
+                      </div>
                     </article>
                   );
                 })}
