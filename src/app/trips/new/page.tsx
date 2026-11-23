@@ -4,195 +4,339 @@ import { FormEvent, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, Download, Sparkles } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  FileUp,
+  Sparkles,
+} from "lucide-react";
 import { parseTripCsv, type ImportPreview } from "@/lib/csv";
-
-const AI_PROMPT_TEMPLATE = `Act as a travel itinerary assistant. Generate a single CSV file formatted for the Routivity travel planner based on my trip details.
-
-MY TRIP DETAILS:
-- Trip Name: [e.g. Bangalore-Hampi-Goa Bike Loop]
-- Dates: [e.g. 2026-11-25 to 2026-11-27]
-- Creator / Lead: [Your Name]
-- Riders / Members: [Names and optional emails, e.g. Rohan (rohan@example.com), Vikram, Ananya]
-- Budget estimates: [e.g. Fuel ₹4500, Stay ₹6000, Food ₹3600]
-- Itinerary overview: [e.g. Day 1 ride from Bangalore to Hampi via NH48, Day 2 explore Hampi temples, Day 3 ride through Western Ghats to Vagator Beach Goa]
-
-CSV FORMAT REQUIREMENTS:
-The CSV must start with this exact header:
-record_type,trip_name,start_date,end_date,creator_name,currency,timezone,member_id,member_name,member_email,category,budget_type,planned_amount,applicable_to,day_number,date,activity_type,title,start_time,end_time,origin,destination,location,via_points,maps_url,bike_id,status,notes
-
-Rules:
-1. First row after header must be a TRIP row:
-   TRIP,<trip_name>,<YYYY-MM-DD>,<YYYY-MM-DD>,<creator_name>,INR,Asia/Kolkata,,,,,,,,,,,,,,,,,,,<notes>
-2. Followed by MEMBER rows:
-   MEMBER,,,,,,,M1,<Name>,<Email>,,,,,,,,,,,,,,,,,,
-   MEMBER,,,,,,,M2,<Name>,<Email>,,,,,,,,,,,,,,,,,,
-3. Followed by BUDGET rows (categories: Fuel, Stay, Food, Parking, Tickets, Shopping, Custom):
-   BUDGET,,,,,,,,,,<Category>,TOTAL,<Amount in Rupees>,ALL,,,,,,,,,,,,,,
-4. Followed by ACTIVITY rows in chronological order (types: TRAVEL, STAY, EXPLORATION, CUSTOM; status: PLANNED):
-   ACTIVITY,,,,,,,,,,,,,,<day_num>,<YYYY-MM-DD>,<TYPE>,<Title>,<HH:MM>,<HH:MM>,<Origin>,<Destination>,<Location>,<Via points separated by semicolons>,,,PLANNED,<Notes>
-
-Output ONLY the raw CSV text without markdown code blocks, commentary, or extra text, ready to be saved directly as a .csv file.`;
+import { AI_PROMPT_TEMPLATE } from "@/lib/ai-prompt";
 
 export default function NewTripPage() {
   const router = useRouter();
-  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [step, setStep] = useState(1);
+  const [preview, setPreview] = useState<ImportPreview>();
   const [fileName, setFileName] = useState("");
   const [tripName, setTripName] = useState("");
   const [authMemberName, setAuthMemberName] = useState("");
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const [showPromptDetails, setShowPromptDetails] = useState(false);
-
   async function copyPrompt() {
-    try {
-      await navigator.clipboard.writeText(AI_PROMPT_TEMPLATE);
-      setCopiedPrompt(true);
-      setTimeout(() => setCopiedPrompt(false), 2500);
-    } catch {
-      // Fallback if clipboard API is restricted
-      setCopiedPrompt(true);
-      setTimeout(() => setCopiedPrompt(false), 2500);
-    }
+    await navigator.clipboard?.writeText(AI_PROMPT_TEMPLATE);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
   }
-
   async function chooseFile(file: File) {
     setFileName(file.name);
-    setTripName("");
     setError("");
-    const nextPreview = parseTripCsv(await file.text());
-    setPreview(nextPreview);
-    const creatorName = nextPreview.trip?.creator_name?.trim().toLowerCase();
-    const matched = creatorName ? nextPreview.members.find((member) => member.member_name.trim().toLowerCase() === creatorName) : undefined;
-    setAuthMemberName(matched?.member_name || "");
+    const next = parseTripCsv(await file.text());
+    setPreview(next);
+    setTripName(next.trip?.trip_name || "");
+    const creator = next.trip?.creator_name?.toLowerCase();
+    const match = next.members.find(
+      (member) => member.member_name.toLowerCase() === creator,
+    );
+    setAuthMemberName(match?.member_name || next.members[0]?.member_name || "");
+    setStep(3);
   }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!preview?.trip) { setError("Choose a valid CSV first."); return; }
-    const errors = preview.issues.filter((issue) => issue.severity === "error");
-    if (errors.length) { setError("Fix the CSV errors before importing."); return; }
-    setPending(true); setError("");
-    const payload = {
-      idempotencyKey: crypto.randomUUID(),
-      trip: { name: tripName.trim(), startDate: preview.trip.start_date, endDate: preview.trip.end_date, timezone: preview.trip.timezone || "Asia/Kolkata", currency: preview.trip.currency || "INR" },
-      members: preview.members.map((member) => ({ name: member.member_name, email: member.member_email || undefined })),
-      authMemberName,
-      activities: preview.activities.map((activity) => ({ type: activity.activity_type as "TRAVEL" | "STAY" | "EXPLORATION" | "CUSTOM", title: activity.title, date: activity.date, startTime: activity.start_time || undefined, endTime: activity.end_time || undefined, origin: activity.origin || undefined, destination: activity.destination || undefined, location: activity.location || undefined, viaPoints: activity.via_points || undefined, mapsUrl: activity.maps_url || undefined, distanceKmMilli: activity.distance_km ? Math.round(Number(activity.distance_km) * 1000) : undefined, bikeId: activity.bike_id || undefined, status: (activity.status || "planned") as "planned" | "done" | "skipped" })),
-      budgets: preview.budgets.map((budget) => ({ category: budget.category, ruleType: budget.budget_type as "PER_DAY" | "PER_NIGHT" | "TOTAL" | "DERIVED", amountPaise: Math.round(Number(budget.planned_amount) * 100), effectiveFrom: /^\d{4}-\d{2}-\d{2}$/.test(budget.applicable_to) ? budget.applicable_to : preview.trip!.start_date })),
-    };
-    const response = await fetch("/api/trips/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const body = await response.json() as { tripId?: string; error?: string };
+    if (!preview?.trip) return;
+    const blocking = preview.issues.filter(
+      (issue) => issue.severity === "error",
+    );
+    if (blocking.length) {
+      setError("Fix the blocking CSV issues before creating the trip.");
+      return;
+    }
+    setPending(true);
+    setError("");
+    const response = await fetch("/api/trips/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        idempotencyKey: crypto.randomUUID(),
+        trip: {
+          name: tripName.trim(),
+          startDate: preview.trip.start_date,
+          endDate: preview.trip.end_date,
+          timezone: preview.trip.timezone || "Asia/Kolkata",
+          currency: preview.trip.currency || "INR",
+        },
+        members: preview.members.map((member) => ({
+          name: member.member_name,
+          email: member.member_email || undefined,
+        })),
+        authMemberName,
+        days: preview.days.map((day) => ({
+          date: day.date,
+          location: day.location || undefined,
+        })),
+        activities: preview.activities.map((activity) => ({
+          type: activity.activity_type,
+          title: activity.title,
+          date: activity.date,
+          startTime: activity.start_time || undefined,
+          endTime: activity.end_time || undefined,
+          origin: activity.origin || undefined,
+          destination: activity.destination || undefined,
+          location: activity.location || undefined,
+          notes: activity.notes || undefined,
+          commitment: activity.commitment || "PLANNED",
+          timeWindow: activity.time_window || undefined,
+          durationMin: activity.duration_min
+            ? Number(activity.duration_min)
+            : undefined,
+          travelMode: activity.travel_mode || undefined,
+          distanceKmMilli: activity.distance_km
+            ? Math.round(Number(activity.distance_km) * 1000)
+            : undefined,
+          stayNights: activity.nights ? Number(activity.nights) : undefined,
+          status: "planned",
+        })),
+        budgets: preview.budgets.map((budget) => ({
+          category: budget.category,
+          ruleType: budget.budget_type,
+          amountPaise: Math.round(Number(budget.planned_amount) * 100),
+          effectiveFrom: /^\d{4}-\d{2}-\d{2}$/.test(budget.applicable_to)
+            ? budget.applicable_to
+            : preview.trip!.start_date,
+        })),
+      }),
+    });
+    const body = (await response.json()) as { tripId?: string; error?: string };
     setPending(false);
-    if (!response.ok) { setError(body.error || "Import failed. Nothing was saved."); return; }
-    router.push("/?trip=" + body.tripId);
-    router.refresh();
+    if (!response.ok) {
+      setError(body.error || "Import failed. Nothing was saved.");
+      return;
+    }
+    setStep(4);
+    window.setTimeout(() => router.push("/?trip=" + body.tripId), 700);
   }
-
+  const issues = preview?.issues || [];
   return (
     <main className="auth-page">
-      <div className="auth-card import-trip-card">
+      <div className="auth-card import-trip-card trip-create-new">
         <Link className="import-back-link" href="/">
-          <ArrowLeft size={15}/> Back to all trips
+          <ChevronLeft size={15} /> Back to all trips
         </Link>
-        <Image src="/logo.png" alt="Routivity" width={190} height={68} priority/>
-        <span className="section-label">CREATE FROM CSV</span>
-        <h1>Bring the whole trip in.</h1>
-        <p>One file creates the trip, members, days, and itinerary together. Nothing is saved until you confirm the preview.</p>
-
-        <div className="ai-prompt-box">
-          <div className="ai-prompt-header">
-            <span className="ai-prompt-title">
-              <Sparkles size={16}/> Generate CSV with AI
-            </span>
-            <button
-              type="button"
-              className={`ai-prompt-copy-btn ${copiedPrompt ? "copied" : ""}`}
-              onClick={copyPrompt}
-              aria-label="Copy AI prompt template"
+        <Image
+          src="/logo.png"
+          alt="Routivity"
+          width={190}
+          height={68}
+          priority
+        />
+        <span className="section-label">CREATE A TRIP</span>
+        <h1>Plan, adjust, and resolve.</h1>
+        <p>
+          Describe your trip to an AI assistant, upload the file it gives you,
+          and we’ll build your itinerary.
+        </p>
+        <div className="create-stepper">
+          {["Plan with AI", "Upload", "Review"].map((label, index) => (
+            <div
+              className={
+                step === index + 1 ? "active" : step > index + 1 ? "done" : ""
+              }
+              key={label}
             >
-              {copiedPrompt ? <Check size={14}/> : <Copy size={14}/>}
-              {copiedPrompt ? "Copied!" : "Copy AI Prompt"}
+              <span>{step > index + 1 ? <Check size={13} /> : index + 1}</span>
+              <b>{label}</b>
+            </div>
+          ))}
+        </div>
+        {step === 1 && (
+          <section className="create-stage">
+            <div className="how-card">
+              <span className="section-label">HOW IT WORKS</span>
+              <ol>
+                <li>Copy the prompt</li>
+                <li>Answer the AI’s questions</li>
+                <li>Upload the CSV it gives you</li>
+              </ol>
+              <p>You can change everything in Routivity after importing.</p>
+            </div>
+            <div className="ai-prompt-box">
+              <div className="ai-prompt-header">
+                <span className="ai-prompt-title">
+                  <Sparkles size={16} /> Plan with ChatGPT or Claude
+                </span>
+                <button
+                  className="ai-prompt-copy-btn"
+                  onClick={() => void copyPrompt}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}{" "}
+                  {copied ? "Copied" : "Copy prompt"}
+                </button>
+              </div>
+              <p className="ai-prompt-desc">
+                The assistant interviews you first, asks about stays and
+                sightseeing, and labels uncertain plans as tentative.
+              </p>
+              <pre className="ai-prompt-preview">{AI_PROMPT_TEMPLATE}</pre>
+              <div className="create-links">
+                <a href="/templates/routivity-sample.csv" download>
+                  <Download size={14} /> Download CSV template
+                </a>
+                <a href="/routivity-trip.csv" download>
+                  <Download size={14} /> See an example trip
+                </a>
+              </div>
+            </div>
+            <button className="auth-submit" onClick={() => setStep(2)}>
+              I have my CSV <ChevronRight size={16} />
             </button>
-          </div>
-          <p className="ai-prompt-desc">
-            Paste this prompt into ChatGPT, Claude, or Gemini to turn your trip idea into the exact Routivity CSV format.
-          </p>
-          <ol className="ai-steps">
-            <li>Click <strong>Copy AI Prompt</strong> and paste into your AI.</li>
-            <li>Replace the placeholders with your route, dates, and riders.</li>
-            <li>Save the AI&apos;s answer as a <code>.csv</code> file and upload it below.</li>
-          </ol>
-          <button
-            type="button"
-            className="ai-prompt-toggle"
-            onClick={() => setShowPromptDetails((prev) => !prev)}
-          >
-            {showPromptDetails ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-            {showPromptDetails ? "Hide prompt template" : "View prompt template"}
-          </button>
-          {showPromptDetails && (
-            <pre className="ai-prompt-preview">{AI_PROMPT_TEMPLATE}</pre>
-          )}
-        </div>
-
-        <label className="trip-name-field">
-          Trip name
-          <input value={tripName} onChange={(event) => setTripName(event.target.value)} placeholder="e.g. Konkan Coast Ride" required />
-          <small>This name is used for the shared trip, regardless of the CSV title.</small>
-        </label>
-
-        <label className="csv-picker">
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void chooseFile(file);
-            }}
-          />
-          <b>{fileName || "Choose your itinerary CSV"}</b>
-          <small>Use the Routivity template, AI-generated CSV, or matching CSV file.</small>
-        </label>
-
-        {preview && (
-          <div className="csv-summary">
-            <strong>{tripName || preview.trip?.trip_name || "Untitled trip"}</strong>
-            <span>{preview.members.length} members · {preview.activities.length} activities</span>
-            <label className="member-link-field">
-              Which CSV member is you?
-              <select value={authMemberName} onChange={(event) => setAuthMemberName(event.target.value)}>
-                {preview.members.map((member) => (
-                  <option key={member.member_id || member.member_name} value={member.member_name}>
-                    {member.member_name}
-                  </option>
-                ))}
-              </select>
-              <small>This member will be linked to your signed-in account and become the trip owner.</small>
-            </label>
-            {preview.issues.slice(0, 6).map((issue, index) => (
-              <small className={issue.severity === "error" ? "csv-error" : "csv-warning"} key={index}>
-                Row {issue.row}, {issue.column}: {issue.message}
-              </small>
-            ))}
-          </div>
+          </section>
         )}
-
-        {error && <div className="auth-error">{error}</div>}
-
-        <form onSubmit={submit}>
-          <button className="auth-submit" disabled={pending || !preview || !authMemberName || !tripName.trim()}>
-            {pending ? "Saving trip…" : "Create trip from CSV"}
-          </button>
-        </form>
-
-        <div className="import-trip-footer">
-          <a className="auth-switch" href="/templates/routivity-sample.csv" download>
-            <Download size={14}/> Download sample template
-          </a>
-        </div>
+        {step === 2 && (
+          <section className="create-stage">
+            <label className="csv-dropzone">
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void chooseFile(file);
+                }}
+              />
+              <FileUp size={28} />
+              <b>Drop your CSV here</b>
+              <small>or tap to choose a .csv file</small>
+            </label>
+            <button className="text-button" onClick={() => setStep(1)}>
+              <ChevronLeft size={14} /> Back to plan
+            </button>
+          </section>
+        )}
+        {step === 3 && preview && (
+          <section className="create-stage review-stage">
+            <div className="review-summary">
+              <span>
+                <b>{preview.days.length || "—"}</b> days
+              </span>
+              <span>
+                <b>{preview.activities.length}</b> activities
+              </span>
+              <span>
+                <b>{preview.members.length}</b> riders
+              </span>
+              <span>
+                <b>{preview.budgets.length}</b> budgets
+              </span>
+            </div>
+            <div className="review-file">
+              <FileUp size={16} /> {fileName}
+              <button className="text-button" onClick={() => setStep(2)}>
+                Replace
+              </button>
+            </div>
+            <div className="review-preview">
+              <span className="section-label">ITINERARY PREVIEW</span>
+              {Array.from(
+                new Set(
+                  preview.activities.map(
+                    (item) => `${item.day_number}|${item.date}`,
+                  ),
+                ),
+              ).map((key) => {
+                const [number, date] = key.split("|");
+                const items = preview.activities.filter(
+                  (item) => item.day_number === number,
+                );
+                return (
+                  <div key={key}>
+                    <b>
+                      Day {number} · {dateLabel(date)}
+                    </b>
+                    <small>{items.map((item) => item.title).join(" · ")}</small>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="review-issues">
+              <span className="section-label">CHECKS · {issues.length}</span>
+              {issues.length ? (
+                issues.map((issue, index) => (
+                  <p
+                    className={
+                      issue.severity === "error" ? "csv-error" : "csv-warning"
+                    }
+                    key={index}
+                  >
+                    Row {issue.row}, {issue.column}: {issue.message}
+                  </p>
+                ))
+              ) : (
+                <p className="csv-success">
+                  <Check size={14} /> Everything looks ready to import.
+                </p>
+              )}
+            </div>
+            <label className="trip-name-field">
+              Trip name
+              <input
+                value={tripName}
+                onChange={(event) => setTripName(event.target.value)}
+                placeholder="e.g. Konkan Coast Ride"
+                required
+              />
+            </label>
+            <label className="member-link-field">
+              Which rider are you?
+              <div className="rider-chips">
+                {preview.members.map((member) => (
+                  <button
+                    type="button"
+                    className={
+                      authMemberName === member.member_name ? "selected" : ""
+                    }
+                    key={member.member_name}
+                    onClick={() => setAuthMemberName(member.member_name)}
+                  >
+                    {authMemberName === member.member_name && (
+                      <Check size={13} />
+                    )}{" "}
+                    {member.member_name}
+                  </button>
+                ))}
+              </div>
+            </label>
+            {error && <div className="auth-error">{error}</div>}
+            <form onSubmit={submit}>
+              <button
+                className="auth-submit"
+                disabled={
+                  pending ||
+                  issues.some((issue) => issue.severity === "error") ||
+                  !tripName.trim() ||
+                  !authMemberName
+                }
+              >
+                {pending ? "Creating trip…" : "Create trip"}
+              </button>
+            </form>
+          </section>
+        )}
+        {step === 4 && (
+          <section className="create-success">
+            <Check size={38} />
+            <h2>Trip created</h2>
+            <p>Opening your itinerary…</p>
+          </section>
+        )}
       </div>
     </main>
   );
+}
+function dateLabel(value: string) {
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(`${value}T00:00:00`));
 }

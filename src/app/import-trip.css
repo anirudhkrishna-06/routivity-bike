@@ -1,6 +1,6 @@
 .import-trip-card {
   max-width: 540px;
-  position: relative
+  position: relative;
 }
 
 .import-back-link {
@@ -12,11 +12,11 @@
   font-weight: 700;
   margin-bottom: 18px;
   text-decoration: none;
-  transition: transform .2s ease
+  transition: transform 0.2s ease;
 }
 
 .import-back-link:hover {
-  transform: translateX(-3px)
+  transform: translateX(-3px);
 }
 
 .ai-prompt-box {
@@ -25,14 +25,14 @@
   border-radius: 16px;
   padding: 16px;
   margin: 20px 0 14px;
-  text-align: left
+  text-align: left;
 }
 
 .ai-prompt-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px
+  gap: 10px;
 }
 
 .ai-prompt-title {
@@ -41,7 +41,7 @@
   gap: 7px;
   font-size: 13px;
   font-weight: 700;
-  color: #285f48
+  color: #285f48;
 }
 
 .ai-prompt-copy-btn {
@@ -56,23 +56,25 @@
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  transition: background-color .2s, transform .15s
+  transition:
+    background-color 0.2s,
+    transform 0.15s;
 }
 
 .ai-prompt-copy-btn:hover {
   background: #1e4736;
-  transform: translateY(-1px)
+  transform: translateY(-1px);
 }
 
 .ai-prompt-copy-btn.copied {
-  background: #1c6b45
+  background: #1c6b45;
 }
 
 .ai-prompt-desc {
   font-size: 11px;
   color: #556358;
   margin: 8px 0 10px;
-  line-height: 1.45
+  line-height: 1.45;
 }
 
 .ai-steps {
@@ -81,7 +83,7 @@
   font-size: 11px;
   color: #435246;
   margin: 10px 0;
-  padding-left: 18px
+  padding-left: 18px;
 }
 
 .ai-steps code {
@@ -89,7 +91,7 @@
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 10px;
-  color: #285f48
+  color: #285f48;
 }
 
 .ai-prompt-toggle {
@@ -103,7 +105,7 @@
   font-weight: 700;
   padding: 0;
   cursor: pointer;
-  margin-top: 4px
+  margin-top: 4px;
 }
 
 .ai-prompt-preview {
@@ -119,14 +121,14 @@
   max-height: 200px;
   overflow-y: auto;
   font-family: monospace;
-  color: #2a382e
+  color: #2a382e;
 }
 
 .import-trip-footer {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 18px
+  margin-top: 18px;
 }
 
 .import-trip-footer .auth-switch {
@@ -134,7 +136,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  text-decoration: none
+  text-decoration: none;
 }
 
 .csv-picker {
@@ -146,17 +148,17 @@
   padding: 18px;
   margin: 14px 0 20px;
   cursor: pointer;
-  color: #285f48
+  color: #285f48;
 }
 
 .csv-picker input {
-  display: none
+  display: none;
 }
 
 .csv-picker small {
   color: #778178;
   font-size: 11px;
-  font-weight: normal
+  font-weight: normal;
 }
 
 .csv-summary {
@@ -167,19 +169,19 @@
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 14px;
-  font-size: 11px
+  font-size: 11px;
 }
 
 .csv-summary span {
-  color: #778178
+  color: #778178;
 }
 
 .csv-error {
-  color: #983d26
+  color: #983d26;
 }
 
 .csv-warning {
-  color: #795d1c
+  color: #795d1c;
 }
 
 .member-link-field {
@@ -190,7 +192,7 @@
   text-align: left;
   color: #19231d;
   font-size: 12px;
-  font-weight: 700
+  font-weight: 700;
 }
 
 .member-link-field select {
@@ -198,47 +200,242 @@
   background: #fffefa;
   border-radius: 10px;
   padding: 10px;
-  color: #19231d
+  color: #19231d;
 }
 
 .member-link-field small {
   font-size: 10px;
   color: #778178;
-  font-weight: 400
+  font-weight: 400;
+}
+
+.trip-create-new {
+  max-width: 680px;
+}
+.create-stepper {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  border-bottom: 1px solid #e6e9e1;
+  padding-bottom: 13px;
+}
+.create-stepper div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #98a39a;
+  font-size: 11px;
+  flex: 1;
+}
+.create-stepper span {
+  display: grid;
+  place-items: center;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  border: 1px solid #dfe5dc;
+  font-size: 10px;
+}
+.create-stepper .active,
+.create-stepper .done {
+  color: #285f48;
+}
+.create-stepper .active span,
+.create-stepper .done span {
+  color: #fff;
+  background: #285f48;
+  border-color: #285f48;
+}
+.create-stage {
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+.how-card {
+  background: #f4f7f2;
+  border: 1px solid #dfe8df;
+  border-radius: 15px;
+  padding: 15px;
+}
+.how-card ol {
+  display: grid;
+  gap: 8px;
+  margin: 11px 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: #435246;
+}
+.how-card p {
+  margin: 0;
+  color: #778178;
+  font-size: 11px;
+}
+.create-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.create-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #285f48;
+  font-size: 11px;
+  text-decoration: none;
+}
+.csv-dropzone {
+  display: grid;
+  place-items: center;
+  gap: 9px;
+  border: 1px dashed #aebdad;
+  background: #f0f6ef;
+  border-radius: 16px;
+  padding: 48px 20px;
+  color: #285f48;
+  cursor: pointer;
+}
+.csv-dropzone input {
+  display: none;
+}
+.csv-dropzone small {
+  color: #778178;
+}
+.review-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.review-summary span {
+  display: grid;
+  gap: 5px;
+  background: #f4f7f2;
+  border-radius: 11px;
+  padding: 10px;
+  color: #778178;
+  font-size: 10px;
+}
+.review-summary b {
+  color: #285f48;
+  font-size: 18px;
+}
+.review-file {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #435246;
+}
+.review-file .text-button {
+  margin-left: auto;
+}
+.review-preview,
+.review-issues {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e6e9e1;
+  border-radius: 13px;
+  padding: 13px;
+}
+.review-preview > div {
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid #edf0eb;
+  padding-top: 8px;
+}
+.review-preview small {
+  font-size: 10px;
+  color: #778178;
+}
+.review-issues p {
+  margin: 0;
+  font-size: 10px;
+}
+.csv-success {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #285f48;
+}
+.rider-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.rider-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #dfe5dc;
+  background: #fffefa;
+  border-radius: 999px;
+  padding: 9px 12px;
+  color: #68746b;
+}
+.rider-chips button.selected {
+  background: #e3f0e6;
+  color: #285f48;
+  border-color: #9ec6a5;
+}
+.create-success {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  padding: 70px 20px;
+  color: #285f48;
+  text-align: center;
+}
+.create-success h2 {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 400;
+}
+.create-success p {
+  margin: 0;
+  color: #778178;
+  font-size: 12px;
+}
+@media (max-width: 520px) {
+  .create-stepper b {
+    font-size: 10px;
+  }
+  .review-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 html[data-theme="dark"] .ai-prompt-box,
 .app.dark .ai-prompt-box {
   background: #17241c;
-  border-color: #2f4738
+  border-color: #2f4738;
 }
 
 html[data-theme="dark"] .ai-prompt-title,
 .app.dark .ai-prompt-title {
-  color: #a8d5b5
+  color: #a8d5b5;
 }
 
 html[data-theme="dark"] .ai-prompt-desc,
 .app.dark .ai-prompt-desc {
-  color: #9cb0a1
+  color: #9cb0a1;
 }
 
 html[data-theme="dark"] .ai-steps,
 .app.dark .ai-steps {
-  color: #b4c7b8
+  color: #b4c7b8;
 }
 
 html[data-theme="dark"] .ai-steps code,
 .app.dark .ai-steps code {
   background: #23372b;
-  color: #a8d5b5
+  color: #a8d5b5;
 }
 
 html[data-theme="dark"] .ai-prompt-preview,
 .app.dark .ai-prompt-preview {
   background: #111a14;
   border-color: #2f4738;
-  color: #d1ded4
+  color: #d1ded4;
 }
 
 .csv-picker {
@@ -250,17 +447,17 @@ html[data-theme="dark"] .ai-prompt-preview,
   padding: 18px;
   margin: 20px 0;
   cursor: pointer;
-  color: #285f48
+  color: #285f48;
 }
 
 .csv-picker input {
-  display: none
+  display: none;
 }
 
 .csv-picker small {
   color: #778178;
   font-size: 11px;
-  font-weight: normal
+  font-weight: normal;
 }
 
 .csv-summary {
@@ -271,19 +468,19 @@ html[data-theme="dark"] .ai-prompt-preview,
   border-radius: 12px;
   padding: 12px;
   margin-bottom: 14px;
-  font-size: 11px
+  font-size: 11px;
 }
 
 .csv-summary span {
-  color: #778178
+  color: #778178;
 }
 
 .csv-error {
-  color: #983d26
+  color: #983d26;
 }
 
 .csv-warning {
-  color: #795d1c
+  color: #795d1c;
 }
 
 .member-link-field {
@@ -294,7 +491,7 @@ html[data-theme="dark"] .ai-prompt-preview,
   text-align: left;
   color: #19231d;
   font-size: 12px;
-  font-weight: 700
+  font-weight: 700;
 }
 
 .member-link-field select {
@@ -302,11 +499,11 @@ html[data-theme="dark"] .ai-prompt-preview,
   background: #fffefa;
   border-radius: 10px;
   padding: 10px;
-  color: #19231d
+  color: #19231d;
 }
 
 .member-link-field small {
   font-size: 10px;
   color: #778178;
-  font-weight: 400
+  font-weight: 400;
 }

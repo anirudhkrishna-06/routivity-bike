@@ -234,10 +234,7 @@ export function AppShell({ user, trips, initialTripId }: Props) {
         ) : active === "Trip Now" ? (
           <TripNowDashboard tripId={selectedTrip.id} onOpenExpenses={openExpenses} />
         ) : active === "Itinerary" ? (
-          <>
-            <ItineraryWorkspace tripId={selectedTrip.id} />
-            <SchedulingPanel tripId={selectedTrip.id} />
-          </>
+          <ItineraryWorkspace tripId={selectedTrip.id} />
         ) : active === "Budget" ? (
           <>
             <BudgetWorkspace tripId={selectedTrip.id} trip={selectedTrip} onAddExpense={() => openExpenses()} />

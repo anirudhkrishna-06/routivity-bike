@@ -1,4 +1,4 @@
-record_type,trip_name,start_date,end_date,creator_name,currency,timezone,member_id,member_name,member_email,category,budget_type,planned_amount,applicable_to,day_number,date,activity_type,title,start_time,end_time,origin,destination,location,via_points,maps_url,bike_id,status,notes
+record_type,trip_name,start_date,end_date,creator_name,currency,timezone,member_id,member_name,member_email,category,budget_type,planned_amount,applicable_to,day_number,date,activity_type,title,start_time,end_time,origin,destination,location,via_points,maps_url,bike_id,status,notes,commitment,time_window,duration_min,travel_mode,distance_km,nights
 TRIP,,,,,,,,,,,,,,,,,,,,,,,,,,,
 MEMBER,,,,,,,,,,,,,,,,,,,,,,,,,,,
 MEMBER,,,,,,,,,,,,,,,,,,,,,,,,,,,

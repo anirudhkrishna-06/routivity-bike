@@ -64,6 +64,13 @@
       "when": 1795328085552,
       "tag": "0008_adorable_loners",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795420795820,
+      "tag": "0009_strong_smiling_tiger",
+      "breakpoints": true
     }
   ]
 }
