@@ -6,22 +6,17 @@ import {
   CalendarPlus,
   Check,
   Copy,
-  Download,
   ExternalLink,
   MapPin,
-  MoreHorizontal,
   Pencil,
   Plus,
-  RefreshCw,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
-import { exportItinerary, type CsvRow } from "@/lib/csv";
 import {
   conflict,
   dayDestination,
-  daySummary,
   freeWindows,
   formatDuration,
   hhmm,
@@ -73,6 +68,99 @@ function timeLabel(value?: string | null) {
         minute: "2-digit",
       }).format(new Date(`2026-01-01T${value}:00`))
     : "";
+}
+
+type TravelDetails = {
+  distanceKm?: number;
+  pureRide?: string;
+  expectedDuration?: string;
+  points: string[];
+};
+
+function parseTravelDetails(notes?: string | null): TravelDetails {
+  const text = notes?.trim() || "";
+  const distance = text.match(/(\d+(?:\.\d+)?)\s*km\b/i)?.[1];
+  const pureRide = text.match(/pure ride\s+([^.(]+?)(?=\s*\(|\s*\.|$)/i)?.[1]?.trim();
+  const expectedDuration = text.match(/pure ride[^.(]*\(([^)]+)\)/i)?.[1]?.trim();
+  const firstStop = text.search(/(?<!\d)\.\s+(?=[A-Z0-9])/);
+  const detailText = firstStop >= 0 ? text.slice(firstStop + 1) : "";
+  const points = detailText
+    .split(/(?<!\d)\.\s+(?=[A-Z0-9])/)
+    .map((point) => point.trim().replace(/[.]$/, ""))
+    .filter(Boolean);
+
+  return {
+    distanceKm: distance ? Number(distance) : undefined,
+    pureRide,
+    expectedDuration,
+    points,
+  };
+}
+
+function AnimatedDistance({ value, active }: { value: number; active: boolean }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (!active || !Number.isFinite(value)) {
+      setDisplayValue(0);
+      return;
+    }
+    let frame = 0;
+    const startedAt = performance.now();
+    const duration = 850;
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(value * eased);
+      if (progress < 1) frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [active, value]);
+
+  return <strong>{Math.round(displayValue).toLocaleString("en-IN")} km</strong>;
+}
+
+function TravelInsights({ item, active }: { item: Activity; active: boolean }) {
+  const parsed = parseTravelDetails(item.notes);
+  const distanceKm = parsed.distanceKm ?? (item.distanceKmMilli ? item.distanceKmMilli / 1000 : undefined);
+  const points = parsed.points;
+  const columns = [points.slice(0, Math.ceil(points.length / 2)), points.slice(Math.ceil(points.length / 2))];
+
+  if (!distanceKm && !parsed.pureRide && !points.length) {
+    return item.notes ? <p>{item.notes}</p> : null;
+  }
+
+  return (
+    <div className="travel-insights">
+      {(distanceKm || parsed.pureRide) && (
+        <div className="travel-metrics">
+          {distanceKm !== undefined && (
+            <div className="travel-metric">
+              <span>Distance</span>
+              <AnimatedDistance value={distanceKm} active={active} />
+            </div>
+          )}
+          {parsed.pureRide && (
+            <div className="travel-metric">
+              <span>Expected duration</span>
+              <strong>{parsed.pureRide}</strong>
+              {parsed.expectedDuration && <small>{parsed.expectedDuration}</small>}
+            </div>
+          )}
+        </div>
+      )}
+      {points.length > 0 && (
+        <div className="travel-points">
+          {columns.map((column, columnIndex) => (
+            <ul key={columnIndex}>
+              {column.map((point) => <li key={point}>{point}</li>)}
+            </ul>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ItineraryWorkspace({ tripId }: { tripId: string }) {
@@ -369,41 +457,6 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
     setBusy(false);
     setDayProposal(body.proposal);
   }
-  function exportCurrent() {
-    const rows = activities.map(
-      (item) =>
-        ({
-          record_type: "ACTIVITY",
-          day_number: String(item.dayNumber),
-          date: item.date,
-          activity_type: item.type,
-          title: item.title,
-          start_time: item.startTime || "",
-          end_time: item.endTime || "",
-          origin: item.origin || "",
-          destination: item.destination || "",
-          location: item.location || "",
-          maps_url: item.mapsUrl || "",
-          status: item.status || "planned",
-          notes: item.notes || "",
-          commitment: item.commitment || "PLANNED",
-          duration_min: item.durationMin ? String(item.durationMin) : "",
-          travel_mode: item.travelMode || "",
-          distance_km: item.distanceKmMilli
-            ? String(item.distanceKmMilli / 1000)
-            : "",
-          nights: item.stayNights ? String(item.stayNights) : "",
-        }) as CsvRow,
-    );
-    const url = URL.createObjectURL(
-      new Blob([exportItinerary(rows)], { type: "text/csv" }),
-    );
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "routivity-itinerary.csv";
-    link.click();
-    URL.revokeObjectURL(url);
-  }
   return (
     <section className="new-itinerary rise-in">
       <div className="itinerary-top">
@@ -445,7 +498,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
             setPanel("day");
           }}
         >
-          <CalendarPlus size={16} />
+          <CalendarPlus size={12} />
           <b>Add day</b>
         </button>
       </div>
@@ -454,32 +507,16 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
           <div className="day-header">
             <div>
               <span className="section-label">
-                DAY {day.dayNumber} · {dateLabel(day.date, true)}
+                {dateLabel(day.date, true)}
               </span>
               <h2>{destination || "Unplanned day"}</h2>
-              <p>{daySummary(day, activities)}</p>
             </div>
             <button className="add-pill" onClick={() => setPanel("menu")}>
-              <Plus size={16} /> Add
+              <Plus size={12} /> Add
             </button>
           </div>
           <div className="timeline">
             <div className="timeline-rail" />
-          {stays.filter((stay) => stay.checkInDay === selectedDay).map((stay) => <div className="stay-band" key={`check-in-${stay.activityId}`}><b>Check in {timeLabel(stay.checkInTime)} · {stay.title}</b><small>{stay.nights} {stay.nights === 1 ? "night" : "nights"}</small></div>)}
-          {stays.filter((stay) => selectedDay >= stay.checkInDay && selectedDay < stay.checkOutDay).map((stay) => <div className="night-divider" key={`night-${stay.activityId}-${selectedDay}`}>☾ Staying at {stay.title}</div>)}
-          {stays.filter((stay) => stay.checkOutDay === selectedDay).map((stay) => <div className="checkout-band" key={`check-out-${stay.activityId}`}>Check out {stay.checkOutTime} · {stay.title}</div>)}
-            {windows.map((window) => (
-              <button
-                className="free-window"
-                key={`${window.start}-${window.end}`}
-                onClick={() => openEvent(undefined, window.start, window.end)}
-              >
-                <b>+ {formatDuration(window.end - window.start)} free</b>
-                <small>
-                  {timeLabel(hhmm(window.start))}–{timeLabel(hhmm(window.end))}
-                </small>
-              </button>
-            ))}
             {!items.length && (
               <div className="empty-day">
                 <Sparkles size={22} />
@@ -524,9 +561,10 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                     {String(item.commitment || "PLANNED").toLowerCase()}
                   </span>
                 </button>
-                {expanded === item.id && (
-                  <div className="event-details">
-                    {item.notes && <p>{item.notes}</p>}
+                <div className={`event-details ${expanded === item.id ? "open" : ""}`} aria-hidden={expanded !== item.id}>
+                    {item.type === "TRAVEL" ? (
+                      <TravelInsights item={item} active={expanded === item.id} />
+                    ) : item.notes ? <p>{item.notes}</p> : null}
                     {item.viaPoints && <small>Via {item.viaPoints}</small>}
                     {item.distanceKmMilli && (
                       <small>
@@ -556,8 +594,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                         <Trash2 size={13} /> Delete
                       </button>
                     </div>
-                  </div>
-                )}
+                </div>
               </article>
             ))}
           </div>
