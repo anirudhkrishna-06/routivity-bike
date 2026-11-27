@@ -15,18 +15,19 @@ import { AnalyticsWorkspace } from "./analytics-workspace";
 import { TripNowDashboard } from "./trip-now-dashboard";
 import { LoadingScreen } from "./loading-screen";
 import { ExpenseModal } from "./expense-modal";
+import { preloadBikeLoader } from "./bike-loader";
 type Trip = { id: string; name: string; startDate: string; endDate: string; currency: string; timezone: string };
-type Props = { user: { name: string; email: string }; trips: Trip[]; initialTripId?: string };
+type Props = { user: { name: string; email: string }; trips: Trip[]; initialTripId?: string; initialView?: "Analytics" };
 type ThemeMode = "system" | "light" | "dark";
 const SchedulingPanel = ItineraryTools;
 const tabs = [{ label: "Itinerary", icon: CalendarDays }, { label: "Budget", icon: WalletCards }, { label: "Settlements", icon: CircleDollarSign }, { label: "Analytics", icon: BarChart3 }];
 function date(value: string) { return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value + "T00:00:00")); }
 function tripStatus(trip: Trip) { const today = new Date().toISOString().slice(0, 10); return today < trip.startDate ? "UPCOMING" : today > trip.endDate ? "PAST" : "ACTIVE"; }
 function resolvedDark(mode: ThemeMode) { return mode === "dark" || (mode === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches); }
-export function AppShell({ user, trips, initialTripId }: Props) {
+export function AppShell({ user, trips, initialTripId, initialView }: Props) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [active, setActive] = useState("Trip Now");
+  const [active, setActive] = useState(initialView || "Trip Now");
   const [theme, setTheme] = useState<ThemeMode>("system");
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,6 +52,7 @@ export function AppShell({ user, trips, initialTripId }: Props) {
   }, [selectedTrip]);
 
   useEffect(() => {
+    preloadBikeLoader();
     setMounted(true);
     const stored = window.localStorage.getItem("routivity-theme") as ThemeMode | null;
     const next = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";

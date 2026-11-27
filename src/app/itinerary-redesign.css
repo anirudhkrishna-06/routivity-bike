@@ -9,7 +9,7 @@
 .trip-strip {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 16px;
 }
 .itinerary-top h1 {
@@ -310,24 +310,31 @@
 }
 .itinerary-overlay {
   position: fixed;
-  z-index: 20;
+  z-index: 1000;
   inset: 0;
-  background: #18251c44;
+  background: rgba(15, 23, 19, .58);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   padding: 18px;
+  animation: itinerary-overlay-in .22s ease both;
 }
+.app-frame:has(.itinerary-overlay){overflow:visible}
 .itinerary-sheet {
   position: relative;
   width: min(520px, 100%);
-  max-height: 90vh;
+  height: min(720px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
   overflow: auto;
   background: #fffefa;
   border-radius: 20px 20px 8px 8px;
-  padding: 24px 18px 22px;
+  padding: 0 18px 22px;
   box-shadow: 0 16px 50px #19231d33;
+  animation: itinerary-sheet-in .28s cubic-bezier(.22,1,.36,1) both;
 }
+.itinerary-modal-header{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;margin:0 -18px 18px;padding:18px;background:#fffefa;border-bottom:1px solid #edf1eb}.itinerary-modal-header h2{margin:0;font-size:20px;font-weight:500}.itinerary-modal-header .sheet-close{position:static}
 .sheet-close {
   position: absolute;
   right: 14px;
@@ -348,17 +355,21 @@
 }
 .add-options {
   display: grid;
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 .add-options button {
   display: grid;
   gap: 4px;
-  text-align: left;
+  text-align: center;
   background: #f4f7f2;
   border: 1px solid #e1e8df;
   border-radius: 13px;
   padding: 13px;
+  min-height: 62px;
+  transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
 }
+.add-options .add-option-event{background:#eaf1ed;border-color:#c6d9ca;color:#285f48}.add-options .add-option-travel{background:#eaf0f6;border-color:#c4d4e3;color:#285b83}.add-options .add-option-stay{background:#f5eee2;border-color:#e2d2b8;color:#7b5a2c}.add-options button:active{transform:scale(.985)}
 .add-options b {
   font-size: 14px;
   color: #285f48;
@@ -367,10 +378,15 @@
   font-size: 11px;
   color: #778178;
 }
+.add-options button:hover,.add-options button:focus-visible{border-color:#8ab69a;background:#eaf4ec;transform:translateY(-1px)}
 .event-form {
   display: grid;
   gap: 11px;
 }
+.event-form .primary-action{position:sticky;bottom:0;z-index:1;box-shadow:0 -10px 18px #fffefa}
+.travel-route-status{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid #dfe8df;border-radius:11px;background:#f3f8f2;color:#526057;font-size:11px}.travel-route-status b{color:#285f48;font-size:13px}.travel-route-status.loading b{color:#7a887e}.travel-route-status.error{border-color:#efd0c8;background:#fff4f0;color:#983d26}.travel-route-status.error b{color:#983d26}
+.travel-times input[readonly]{background:#f1f5f0;color:#285f48;font-weight:700;cursor:default}
+.place-field{position:relative;min-width:0}.place-field label{display:grid;gap:5px;color:#68746b;font-size:10px}.place-input-wrap{position:relative}.place-field input{width:100%;box-sizing:border-box;border:1px solid #dfe5dc;background:white;border-radius:9px;padding:10px;font-size:12px}.place-field input:focus{outline:0;border-color:#7ca88a;box-shadow:0 0 0 3px #285f4816}.place-spinner{position:absolute;right:11px;top:50%;width:13px;height:13px;margin-top:-7px;border:2px solid #dce6de;border-top-color:#285f48;border-radius:50%;animation:place-spin .7s linear infinite}.place-results{position:absolute;z-index:4;left:0;right:0;top:calc(100% + 6px);display:grid;background:#fff;border:1px solid #dfe5dc;border-radius:12px;box-shadow:0 14px 30px #19231d22;overflow:hidden;transform-origin:top;animation:place-menu-in .18s cubic-bezier(.22,1,.36,1) both}.place-results button{padding:11px 12px;text-align:left;border:0;border-bottom:1px solid #edf1eb;background:white;color:#34443a;font-size:12px;transition:background .15s ease,padding .15s ease}.place-results button:last-child{border-bottom:0}.place-results button:hover,.place-results button:focus-visible{padding-left:15px;background:#eef6ef;outline:0}.place-empty{padding:12px;color:#778178;font-size:11px}
 .event-form > input,
 .event-form > label input,
 .event-form > label select,
@@ -419,12 +435,10 @@
 }
 .fit-note {
   margin: 0;
-  padding: 9px;
-  border-radius: 9px;
-  background: #e3f0e6;
-  color: #285f48;
+  color: #68746b;
   font-size: 11px;
 }
+.travel-day-note{display:block;margin-top:5px;color:#285f48;font-size:10px;font-weight:700}
 .suggestions {
   display: grid;
   gap: 8px;
@@ -493,6 +507,7 @@
 .app.dark .travel-metric small,
 .app.dark .travel-points li { color: #b8c8bc; }
 .app.dark .travel-metric strong { color: #bde2c5; }
+@keyframes itinerary-overlay-in{from{opacity:0}to{opacity:1}}@keyframes itinerary-sheet-in{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}@keyframes place-menu-in{from{opacity:0;transform:translateY(-5px) scaleY(.96)}to{opacity:1;transform:none}}@keyframes place-spin{to{transform:rotate(360deg)}}
 @media (min-width: 1024px) {
   .itinerary-sheet {
     margin-left: auto;
@@ -554,8 +569,16 @@
   }
   .itinerary-overlay {
     padding: 0;
+    align-items: center;
   }
   .itinerary-sheet {
-    border-radius: 20px 20px 0 0;
+    width: calc(100% - 24px);
+    height: min(680px, calc(100dvh - 24px));
+    max-height: calc(100dvh - 24px);
+    border-radius: 24px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
+  .itinerary-modal-header{margin-left:-16px;margin-right:-16px;padding:16px}.itinerary-modal-header h2{font-size:18px}.form-grid{grid-template-columns:1fr;gap:11px}.event-form .primary-action{margin:0 -2px;padding:13px 16px;border-radius:13px;background:#19231d;color:#fffefa;box-shadow:0 -12px 18px #fffefa}.add-options{gap:8px}.add-options button{min-height:62px}
 }
+@media (prefers-reduced-motion: reduce){.itinerary-overlay,.itinerary-sheet,.place-results,.place-spinner{animation:none}}

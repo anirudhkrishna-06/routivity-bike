@@ -2,6 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { ExpenseForm, type MoneyData } from "./money-workspace";
+import { LoadingScreen } from "./loading-screen";
+
+function cachedMoney(tripId: string) {
+  if (typeof window === "undefined") return null;
+  try {
+    const cached = window.localStorage.getItem(`routivity-money-${tripId}`);
+    return cached ? (JSON.parse(cached) as MoneyData) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function ExpenseModal({
   tripId,
@@ -14,21 +25,13 @@ export function ExpenseModal({
   onClose: () => void;
   onSaved?: () => void;
 }) {
-  const [data, setData] = useState<MoneyData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<MoneyData | null>(() => cachedMoney(tripId));
+  const [loading, setLoading] = useState(() => !cachedMoney(tripId));
   const [error, setError] = useState("");
 
   useEffect(() => {
     let isCurrent = true;
     const cacheKey = `routivity-money-${tripId}`;
-    try {
-      const cached = window.localStorage.getItem(cacheKey);
-      if (cached) {
-        const parsed = JSON.parse(cached) as MoneyData;
-        setData(parsed);
-        setLoading(false);
-      }
-    } catch {}
 
     fetch(`/api/trips/${tripId}/money`)
       .then(async (res) => {
@@ -65,7 +68,7 @@ export function ExpenseModal({
           onClick={(event) => event.stopPropagation()}
           style={{ minHeight: "180px", display: "grid", placeItems: "center" }}
         >
-          <p style={{ color: "#778178", fontSize: "13px" }}>Loading…</p>
+          <LoadingScreen inline label="Loading expenses" />
         </div>
       </div>
     );

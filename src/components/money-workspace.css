@@ -597,7 +597,7 @@ html[data-theme="dark"] .expense-sheet-footer {
 
 .balance-strip:empty:before,
 .settlement-balance:empty:before {
-  content: "Loading shared balances…";
+  content: "";
   display: block;
   width: 100%;
   height: 16px;

@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarPlus,
   Check,
@@ -26,6 +26,7 @@ import {
   type ItineraryActivity,
   type ItineraryDay,
 } from "@/lib/itinerary/engine";
+import { LoadingScreen } from "./loading-screen";
 
 type Activity = ItineraryActivity & {
   endTime?: string | null;
@@ -36,6 +37,10 @@ type Activity = ItineraryActivity & {
   stayNights?: number | null;
   sortOrder: number;
   distanceKmMilli?: number | null;
+  originLat?: number | null;
+  originLon?: number | null;
+  destinationLat?: number | null;
+  destinationLon?: number | null;
 };
 type Panel = "menu" | "event" | "side" | "day" | "delete" | "conflict" | null;
 const initialForm = {
@@ -53,7 +58,53 @@ const initialForm = {
   travelMode: "Bike",
   distanceKm: "",
   nights: "1",
+  originLat: "",
+  originLon: "",
+  destinationLat: "",
+  destinationLon: "",
 };
+
+type Place = { label: string; lat: number; lon: number };
+
+function travelDurationMinutes(distanceKm: number) {
+  return Math.max(1, Math.ceil(distanceKm) + Math.floor(distanceKm / 100) * 20);
+}
+
+function travelArrival(startTime: string, distanceKm: number) {
+  const start = minutes(startTime) || 0;
+  const rounded = Math.max(30, Math.round((start + travelDurationMinutes(distanceKm)) / 30) * 30);
+  return { time: hhmm(rounded % (24 * 60)), dayOffset: Math.floor(rounded / (24 * 60)) };
+}
+
+function PlaceInput({ label, value, onChange, onSelect }: { label: string; value: string; onChange: (value: string) => void; onSelect: (place: Place) => void }) {
+  const [results, setResults] = useState<Place[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+  const selectedValue = useRef("");
+  useEffect(() => {
+    if (selectedValue.current === value) {
+      setResults([]);
+      setLoading(false);
+      setOpen(false);
+      return;
+    }
+    if (value.trim().length < 2) { setResults([]); setLoading(false); return; }
+    const controller = new AbortController();
+    setLoading(true);
+    const timer = window.setTimeout(() => {
+      fetch(`/api/geoapify?text=${encodeURIComponent(value)}`, { signal: controller.signal })
+        .then((response) => response.json() as Promise<{ features?: { properties?: { formatted?: string; lat?: number; lon?: number } }[] }>)
+        .then((body) => setResults((body.features || []).flatMap((feature) => {
+          const item = feature.properties;
+          return item?.formatted && item.lat !== undefined && item.lon !== undefined ? [{ label: item.formatted, lat: item.lat, lon: item.lon }] : [];
+        })))
+        .catch(() => { if (!controller.signal.aborted) setResults([]); })
+        .finally(() => { if (!controller.signal.aborted) { setLoading(false); setOpen(true); } });
+    }, 280);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [value]);
+  return <div className="place-field"><label>{label}<span className="place-input-wrap"><input role="combobox" aria-expanded={open && results.length > 0} value={value} autoComplete="off" onFocus={() => { if (results.length > 0) setOpen(true); }} onChange={(event) => { selectedValue.current = ""; onChange(event.target.value); setOpen(true); }} />{loading && <i className="place-spinner" aria-hidden="true" />}</span></label>{open && results.length > 0 && <div className="place-results" role="listbox">{results.map((place) => <button type="button" role="option" key={`${place.label}-${place.lat}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { selectedValue.current = place.label; setResults([]); setLoading(false); setOpen(false); onSelect(place); }}>{place.label}</button>)}</div>}{open && !loading && value.trim().length >= 2 && results.length === 0 && !selectedValue.current && <div className="place-results place-empty">No places found</div>}</div>;
+}
 function dateLabel(value: string, long = false) {
   return new Intl.DateTimeFormat("en-IN", {
     weekday: long ? "long" : "short",
@@ -172,8 +223,10 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
   const [editing, setEditing] = useState<Activity>();
   const [form, setForm] = useState({ ...initialForm });
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("Loading your itinerary…");
+  const [message, setMessage] = useState("");
+  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [routeStatus, setRouteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [online, setOnline] = useState(true);
   const [sideTitle, setSideTitle] = useState("");
   const [sideDuration, setSideDuration] = useState("60");
@@ -239,6 +292,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
           1,
       );
       setMessage("Your itinerary is saved and shared with the trip.");
+      setReady(true);
       window.localStorage.setItem(
         cacheKey,
         JSON.stringify({
@@ -257,6 +311,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
           setActivities(value.activities);
           setDays(value.days);
           setMessage("Viewing saved itinerary (offline). Reconnect to edit.");
+          setReady(true);
           return;
         } catch {}
       }
@@ -265,12 +320,40 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
           ? caught.message
           : "Couldn't load your itinerary.",
       );
+      setReady(true);
     }
   }
   useEffect(() => {
     void load();
   }, [tripId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const update = () => setOnline(navigator.onLine); update(); window.addEventListener("online", update); window.addEventListener("offline", update); return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); }; }, []);
+  useEffect(() => { if (!panel) return; const previous = document.body.style.overflow; document.body.style.overflow = "hidden"; return () => { document.body.style.overflow = previous; }; }, [panel]);
+  useEffect(() => {
+    if (panel !== "event" || form.type !== "TRAVEL" || !form.origin.trim() || !form.destination.trim()) {
+      if (form.type !== "TRAVEL") setRouteStatus("idle");
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setRouteStatus("loading");
+      fetch("/api/geoapify", { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal, body: JSON.stringify({
+        origin: form.originLat ? { lat: Number(form.originLat), lon: Number(form.originLon) } : form.origin,
+        destination: form.destinationLat ? { lat: Number(form.destinationLat), lon: Number(form.destinationLon) } : form.destination,
+        mode: "motorcycle",
+      }) }).then(async (response) => {
+        const body = await response.json() as { distanceKm?: number };
+        if (!response.ok || !body.distanceKm) throw new Error("No route");
+        setForm((old) => ({ ...old, distanceKm: String(body.distanceKm) }));
+        setRouteStatus("ready");
+      }).catch(() => { if (!controller.signal.aborted) setRouteStatus("error"); });
+    }, 360);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [panel, form.type, form.origin, form.destination, form.originLat, form.originLon, form.destinationLat, form.destinationLon]);
+  useEffect(() => {
+    if (panel !== "event" || form.type !== "TRAVEL" || !form.distanceKm || !form.startTime) return;
+    const nextEnd = travelArrival(form.startTime, Number(form.distanceKm)).time;
+    if (form.endTime !== nextEnd) setForm((old) => ({ ...old, endTime: nextEnd }));
+  }, [panel, form.type, form.distanceKm, form.startTime, form.endTime]);
   function openEvent(item?: Activity, start?: number, end?: number) {
     if (!online) return;
     if (item) {
@@ -305,7 +388,8 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
         date: day?.date || "",
         startTime: hhmm(from),
         endTime: hhmm(end ?? from + 60),
-        location: "",
+        location: destination,
+        origin: days.find((candidate) => candidate.dayNumber === selectedDay - 1)?.location || days[0]?.location || "",
       });
     }
     setError("");
@@ -315,7 +399,17 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
     setForm((old) => ({ ...old, [key]: value }));
   }
   async function saveEvent() {
-    if (!form.title || !form.date) return;
+    if ((!form.title && form.type !== "STAY") || !form.date) return;
+    let routeDistance = form.distanceKm;
+    if (form.type === "TRAVEL" && form.origin && form.destination && !form.distanceKm) {
+      try {
+        const route = await fetch("/api/geoapify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ origin: form.originLat ? { lat: Number(form.originLat), lon: Number(form.originLon) } : form.origin, destination: form.destinationLat ? { lat: Number(form.destinationLat), lon: Number(form.destinationLon) } : form.destination, mode: "motorcycle" }) });
+        const body = await route.json() as { distanceKm?: number; error?: string };
+        if (!route.ok || !body.distanceKm) throw new Error(body.error || "Unable to calculate route");
+        routeDistance = String(body.distanceKm);
+        update("distanceKm", routeDistance);
+      } catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to calculate route"); return; }
+    }
     const dayNumber =
       days.find((item) => item.date === form.date)?.dayNumber || selectedDay;
     const clash = conflict(
@@ -338,7 +432,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
     const activity = {
       type: (form.type === "BREAK" ? "CUSTOM" : form.type) as
         "TRAVEL" | "STAY" | "EXPLORATION" | "CUSTOM",
-      title: form.title,
+      title: form.title || "Stay",
       date: form.date,
       startTime: form.startTime || undefined,
       endTime: form.endTime || undefined,
@@ -349,8 +443,8 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
       commitment: form.commitment as
         "PLANNED" | "OPTIONAL" | "TENTATIVE" | "CONFIRMED",
       travelMode: form.travelMode,
-      distanceKmMilli: form.distanceKm
-        ? Math.round(Number(form.distanceKm) * 1000)
+      distanceKmMilli: routeDistance
+        ? Math.round(Number(routeDistance) * 1000)
         : undefined,
       stayNights: form.type === "STAY" ? Number(form.nights) || 1 : undefined,
       status: form.status as "planned" | "done" | "skipped",
@@ -457,6 +551,10 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
     setBusy(false);
     setDayProposal(body.proposal);
   }
+  if (!ready) return <LoadingScreen inline label="Loading your itinerary" />;
+  const travelArrivalInfo = form.type === "TRAVEL" && form.distanceKm && form.startTime
+    ? travelArrival(form.startTime, Number(form.distanceKm))
+    : null;
   return (
     <section className="new-itinerary rise-in">
       <div className="itinerary-top">
@@ -610,19 +708,12 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
           }}
         >
           <div className="itinerary-sheet" role="dialog" aria-modal="true">
-            <button
-              className="sheet-close"
-              onClick={() => setPanel(null)}
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
+            <header className="itinerary-modal-header"><h2>{panel === "menu" ? "Add" : editing ? `Edit ${form.type === "TRAVEL" ? "Travel" : form.type === "STAY" ? "Stay" : "Event"}` : `Add ${form.type === "TRAVEL" ? "Travel" : form.type === "STAY" ? "Stay" : "Event"}`}</h2><button className="sheet-close" onClick={() => setPanel(null)} aria-label="Close"><X size={18} /></button></header>
             {panel === "menu" && (
               <>
                 <span className="section-label">
                   ADDING TO DAY {selectedDay}
                 </span>
-                <h2>What are you adding?</h2>
                 <div className="add-options">
                   {[
                     ["Event", "A sight, activity or break", () => openEvent()],
@@ -667,12 +758,11 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                     ] as const,
                   ].map((option) => {
                     const label = String(option[0]);
-                    const text = String(option[1]);
                     const action = option[2] as () => void;
+                    if (label === "Side visit" || label === "Complete day") return null;
                     return (
-                    <button key={label} onClick={action}>
+                    <button className={`add-option-${label.toLowerCase()}`} key={label} onClick={action}>
                       <b>{label}</b>
-                      <small>{text}</small>
                     </button>
                     );
                   })}
@@ -681,46 +771,24 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
             )}
             {panel === "event" && (
               <div className="event-form">
-                <span className="section-label">
-                  {editing ? "EDIT EVENT" : `ADDING TO DAY ${selectedDay}`}
-                </span>
-                <h2>{editing ? "Edit event" : "Add an event"}</h2>
-                <input
+                {form.type !== "TRAVEL" && <input
                   autoFocus
-                  placeholder="What are you adding?"
+                  placeholder={form.type === "STAY" ? "Hotel name (optional)" : "Event name"}
                   value={form.title}
                   onChange={(e) => update("title", e.target.value)}
-                />
-                <div className="chip-row">
-                  {[
-                    ["EXPLORATION", "Event"],
-                    ["TRAVEL", "Travel"],
-                    ["STAY", "Stay"],
-                    ["BREAK", "Break"],
-                  ].map(([value, label]) => (
-                    <button
-                      className={form.type === value ? "active" : ""}
-                      key={value}
-                      onClick={() => update("type", value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <label>
+                />}
+                {/* The active itinerary day is supplied by the workspace context. */}
+                {false && <label>
                   Day
-                  <select
-                    value={form.date}
-                    onChange={(e) => update("date", e.target.value)}
-                  >
+                  <select value={form.date} onChange={(e) => update("date", e.target.value)}>
                     {days.map((item) => (
                       <option key={item.id} value={item.date}>
                         Day {item.dayNumber} · {dateLabel(item.date)}
                       </option>
                     ))}
                   </select>
-                </label>
-                <div className="form-grid">
+                </label>}
+                {form.type !== "STAY" && form.type !== "TRAVEL" && <div className="form-grid">
                   <label>
                     Start
                     <input
@@ -729,15 +797,15 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                       onChange={(e) => update("startTime", e.target.value)}
                     />
                   </label>
-                  <label>
+                  {form.type !== "TRAVEL" && <label>
                     End
                     <input
                       type="time"
                       value={form.endTime}
                       onChange={(e) => update("endTime", e.target.value)}
                     />
-                  </label>
-                </div>
+                  </label>}
+                </div>}
                 <p className="fit-note">
                   {conflict(
                     activities.filter((item) => item.date === form.date),
@@ -746,67 +814,20 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                     editing?.id,
                   )
                     ? "Overlaps another event · adjust the time"
-                    : "Fits · suggestions are editable"}
+                    : ""}
                 </p>
-                <label>
-                  Location
-                  <input
-                    placeholder={destination ? `in ${destination}` : "Location"}
-                    value={form.location}
-                    onChange={(e) => update("location", e.target.value)}
-                  />
-                </label>
                 {form.type === "TRAVEL" && (
-                  <div className="form-grid">
-                    <label>
-                      Origin
-                      <input
-                        value={form.origin}
-                        onChange={(e) => update("origin", e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Destination
-                      <input
-                        value={form.destination}
-                        onChange={(e) => update("destination", e.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Mode
-                      <select
-                        value={form.travelMode}
-                        onChange={(e) => update("travelMode", e.target.value)}
-                      >
-                        {["Bike", "Car", "Train", "Bus", "Flight", "Walk"].map(
-                          (mode) => (
-                            <option key={mode}>{mode}</option>
-                          ),
-                        )}
-                      </select>
-                    </label>
-                    <label>
-                      Distance km
-                      <input
-                        type="number"
-                        value={form.distanceKm}
-                        onChange={(e) => update("distanceKm", e.target.value)}
-                      />
-                    </label>
+                  <>
+                  <div className="form-grid travel-places">
+                    <PlaceInput label="Origin" value={form.origin} onChange={(value) => setForm((old) => ({ ...old, origin: value, originLat: "", originLon: "", distanceKm: "" }))} onSelect={(place) => setForm((old) => ({ ...old, origin: place.label, originLat: String(place.lat), originLon: String(place.lon), distanceKm: "" }))} />
+                    <PlaceInput label="Destination" value={form.destination} onChange={(value) => setForm((old) => ({ ...old, destination: value, destinationLat: "", destinationLon: "", distanceKm: "" }))} onSelect={(place) => setForm((old) => ({ ...old, destination: place.label, destinationLat: String(place.lat), destinationLon: String(place.lon), distanceKm: "" }))} />
                   </div>
+                  <div className="form-grid travel-times"><label>Start time<input type="time" value={form.startTime} onChange={(e) => update("startTime", e.target.value)} /></label><label>End time<input type="time" value={form.endTime} readOnly aria-readonly="true" />{travelArrivalInfo?.dayOffset ? <small className="travel-day-note">Day {selectedDay + travelArrivalInfo.dayOffset}</small> : null}</label></div>
+                  </>
                 )}
-                {form.type === "STAY" && (
-                  <label>
-                    Nights
-                    <input
-                      type="number"
-                      min="1"
-                      value={form.nights}
-                      onChange={(e) => update("nights", e.target.value)}
-                    />
-                  </label>
-                )}
-                <label>
+                {form.type === "TRAVEL" && <div className={`travel-route-status ${routeStatus}`}><span>{routeStatus === "loading" ? "Calculating route" : routeStatus === "error" ? "Route unavailable" : "Route distance"}</span><b>{form.distanceKm ? `${Number(form.distanceKm).toFixed(1)} km` : routeStatus === "loading" ? "…" : "—"}</b></div>}
+                {form.type === "STAY" && <label>Location<input placeholder={destination || "Location"} value={form.location} onChange={(e) => update("location", e.target.value)} /></label>}
+                {false && <label>
                   Commitment
                   <select
                     value={form.commitment}
@@ -817,7 +838,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                     <option>TENTATIVE</option>
                     <option>CONFIRMED</option>
                   </select>
-                </label>
+                </label>}
                 <label>
                   Note
                   <textarea
@@ -830,7 +851,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                 {dayProposal && <p className="fit-note">Review the proposed before/after change, then apply it.</p>}
                 <button
                   className="primary-action"
-                  disabled={!form.title || busy}
+                  disabled={(form.type !== "STAY" && !form.title) || busy || (form.type === "TRAVEL" && (!form.origin || !form.destination))}
                   onClick={() => void saveEvent()}
                 >
                   {busy

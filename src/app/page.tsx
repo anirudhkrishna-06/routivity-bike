@@ -8,7 +8,7 @@ import { AppShell } from "@/components/app-shell";
 
 export const instant = false;
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ trip?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ trip?: string; view?: string }> }) {
   await connection();
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
@@ -24,6 +24,6 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ t
   }).from(trips).innerJoin(participants, and(eq(participants.tripId, trips.id), eq(participants.userId, user.id), eq(participants.status, "active")));
 
   const query = await searchParams;
-  return <AppShell user={{ name: user.name, email: user.email }} trips={uniqueTrips} initialTripId={query.trip} />;
+  return <AppShell user={{ name: user.name, email: user.email }} trips={uniqueTrips} initialTripId={query.trip} initialView={query.view === "analytics" ? "Analytics" : undefined} />;
 }
 

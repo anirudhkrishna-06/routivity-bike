@@ -148,6 +148,9 @@ export async function createExpense(input: ExpenseInput) {
         odometerKm: input.odometerKmMilli,
       })
       .returning();
+    if (input.category === "STAY" && input.activityId && input.description?.trim()) {
+      await tx.update(activities).set({ title: input.description.trim(), updatedAt: new Date() }).where(eq(activities.id, input.activityId));
+    }
     await tx.insert(expensePayments).values(
       input.payments.map((item) => ({
         expenseId: expense.id,
@@ -275,6 +278,9 @@ export async function editExpense(input: {
       })
       .where(eq(expenses.id, current.id))
       .returning();
+    if ((input.change.category ?? current.category) === "STAY" && (input.change.activityId ?? current.activityId) && input.change.description?.trim()) {
+      await tx.update(activities).set({ title: input.change.description.trim(), updatedAt: new Date() }).where(eq(activities.id, input.change.activityId ?? current.activityId!));
+    }
     await audit(input.tripId, user.id, "revised", current.id, input.change, tx);
     const payload = { expenseId: updated.id };
     await tx.insert(mutations).values({

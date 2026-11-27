@@ -647,6 +647,9 @@ export async function createActivity(input: {
     ),
   });
   if (!day) throw new Error("Activity date is outside the trip");
+  const configuredBike = input.activity.type === "TRAVEL" && !input.activity.bikeId
+    ? await db.query.bikes.findFirst({ where: eq(bikes.tripId, input.tripId) })
+    : undefined;
   const result = await db.transaction(async (tx) => {
     await ensureNoOverlap(
       tx,
@@ -674,6 +677,7 @@ export async function createActivity(input: {
         timeWindow: input.activity.timeWindow,
         durationMin: input.activity.durationMin,
         travelMode: input.activity.travelMode,
+        bikeId: input.activity.bikeId ?? configuredBike?.id,
         stayNights: input.activity.stayNights,
         status: input.activity.status || "planned",
         movable:
