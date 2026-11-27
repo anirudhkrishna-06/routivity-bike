@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarPlus,
   Check,
@@ -65,6 +66,18 @@ const initialForm = {
 };
 
 type Place = { label: string; lat: number; lon: number };
+
+function readCachedItinerary(tripId: string) {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = window.localStorage.getItem(`routivity-itinerary-${tripId}`);
+    if (!value) return null;
+    const cached = JSON.parse(value) as { activities?: Activity[]; days?: ItineraryDay[] };
+    return { activities: cached.activities || [], days: cached.days || [] };
+  } catch {
+    return null;
+  }
+}
 
 function travelDurationMinutes(distanceKm: number) {
   return Math.max(1, Math.ceil(distanceKm) + Math.floor(distanceKm / 100) * 20);
@@ -215,8 +228,8 @@ function TravelInsights({ item, active }: { item: Activity; active: boolean }) {
 }
 
 export function ItineraryWorkspace({ tripId }: { tripId: string }) {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [days, setDays] = useState<ItineraryDay[]>([]);
+  const [activities, setActivities] = useState<Activity[]>(() => readCachedItinerary(tripId)?.activities || []);
+  const [days, setDays] = useState<ItineraryDay[]>(() => readCachedItinerary(tripId)?.days || []);
   const [selectedDay, setSelectedDay] = useState(1);
   const [expanded, setExpanded] = useState<string>();
   const [panel, setPanel] = useState<Panel>(null);
@@ -224,7 +237,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
   const [form, setForm] = useState({ ...initialForm });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => Boolean(readCachedItinerary(tripId)));
   const [busy, setBusy] = useState(false);
   const [routeStatus, setRouteStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [online, setOnline] = useState(true);
@@ -291,7 +304,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
           body.days?.[0]?.dayNumber ||
           1,
       );
-      setMessage("Your itinerary is saved and shared with the trip.");
+      setMessage("Look out for the plan below!");
       setReady(true);
       window.localStorage.setItem(
         cacheKey,
@@ -582,9 +595,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
             >
               <small>{dateLabel(item.date)}</small>
               <b>{place || "Free day"}</b>
-              <span>
-                {count} {count === 1 ? "item" : "items"}
-              </span>
+              
             </button>
           );
         })}
@@ -700,20 +711,18 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
       )}
       {error && <div className="itinerary-error">{error}</div>}
       {toast && <div className="undo-toast" role="status"><span>{toast.message}</span><button onClick={() => { toast.undo(); setToast(undefined); }}>Undo</button></div>}
-      {panel && (
+      {panel && typeof document !== "undefined" && createPortal((
         <div
           className="itinerary-overlay"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setPanel(null);
           }}
         >
-          <div className="itinerary-sheet" role="dialog" aria-modal="true">
+          <div className="itinerary-sheet itinerary-modal" role="dialog" aria-modal="true">
             <header className="itinerary-modal-header"><h2>{panel === "menu" ? "Add" : editing ? `Edit ${form.type === "TRAVEL" ? "Travel" : form.type === "STAY" ? "Stay" : "Event"}` : `Add ${form.type === "TRAVEL" ? "Travel" : form.type === "STAY" ? "Stay" : "Event"}`}</h2><button className="sheet-close" onClick={() => setPanel(null)} aria-label="Close"><X size={18} /></button></header>
             {panel === "menu" && (
               <>
-                <span className="section-label">
-                  ADDING TO DAY {selectedDay}
-                </span>
+                
                 <div className="add-options">
                   {[
                     ["Event", "A sight, activity or break", () => openEvent()],
@@ -770,7 +779,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
               </>
             )}
             {panel === "event" && (
-              <div className="event-form">
+              <div className="event-form activity-event-form">
                 {form.type !== "TRAVEL" && <input
                   autoFocus
                   placeholder={form.type === "STAY" ? "Hotel name (optional)" : "Event name"}
@@ -1045,7 +1054,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
             )}
           </div>
         </div>
-      )}
+      ), document.body)}
     </section>
   );
 }

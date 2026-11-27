@@ -48,7 +48,18 @@ export async function POST(request: Request) {
     const result = await response.json() as { features?: { properties?: { distance?: number; time?: number } }[] };
     const properties = result.features?.[0]?.properties;
     if (!properties?.distance) throw new Error("No route found");
-    return NextResponse.json({ distanceKm: properties.distance / 1000, durationMinutes: properties.time ? Math.round(properties.time / 60) : null });
+    const maps = new URL("https://www.google.com/maps/dir/");
+    maps.searchParams.set("api", "1");
+    maps.searchParams.set("origin", `${origin.lat},${origin.lon}`);
+    maps.searchParams.set("destination", `${destination.lat},${destination.lon}`);
+    maps.searchParams.set("travelmode", "two-wheeler");
+    return NextResponse.json({
+      distanceKm: properties.distance / 1000,
+      durationMinutes: properties.time ? Math.round(properties.time / 60) : null,
+      googleMapsUrl: maps.toString(),
+      resolvedOrigin: origin,
+      resolvedDestination: destination,
+    });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to calculate route" }, { status: 400 });
   }
