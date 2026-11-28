@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BarChart3, CalendarDays, CircleDollarSign, LogOut, Moon, Plus, Sun, UserRound, WalletCards } from "lucide-react";
+import { ArrowLeft, BarChart3, CalendarDays, CircleDollarSign, LogOut, Plus, UserRound, WalletCards } from "lucide-react";
 import gsap from "gsap";
 import { ItineraryWorkspace } from "./itinerary-workspace";
 import { ItineraryTools } from "./scheduling-panel";
@@ -18,17 +18,13 @@ import { ExpenseModal } from "./expense-modal";
 import { preloadBikeLoader } from "./bike-loader";
 type Trip = { id: string; name: string; startDate: string; endDate: string; currency: string; timezone: string };
 type Props = { user: { name: string; email: string }; trips: Trip[]; initialTripId?: string; initialView?: "Analytics" };
-type ThemeMode = "system" | "light" | "dark";
 const SchedulingPanel = ItineraryTools;
 const tabs = [{ label: "Itinerary", icon: CalendarDays }, { label: "Budget", icon: WalletCards }, { label: "Settlements", icon: CircleDollarSign }, { label: "Analytics", icon: BarChart3 }];
 function date(value: string) { return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value + "T00:00:00")); }
 function tripStatus(trip: Trip) { const today = new Date().toISOString().slice(0, 10); return today < trip.startDate ? "UPCOMING" : today > trip.endDate ? "PAST" : "ACTIVE"; }
-function resolvedDark(mode: ThemeMode) { return mode === "dark" || (mode === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches); }
 export function AppShell({ user, trips, initialTripId, initialView }: Props) {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(initialView || "Trip Now");
-  const [theme, setTheme] = useState<ThemeMode>("system");
   const [profileOpen, setProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState(initialTripId && trips.some((trip) => trip.id === initialTripId) ? initialTripId : undefined);
@@ -36,7 +32,6 @@ export function AppShell({ user, trips, initialTripId, initialView }: Props) {
   const [expenseCategory, setExpenseCategory] = useState<string | undefined>();
   const hubRef = useRef<HTMLElement>(null);
   const selectedTrip = trips.find((trip) => trip.id === selectedTripId);
-  const dark = mounted ? resolvedDark(theme) : false;
 
   useEffect(() => {
     if (selectedTrip || !hubRef.current) return;
@@ -53,25 +48,8 @@ export function AppShell({ user, trips, initialTripId, initialView }: Props) {
 
   useEffect(() => {
     preloadBikeLoader();
-    setMounted(true);
-    const stored = window.localStorage.getItem("routivity-theme") as ThemeMode | null;
-    const next = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
-    setTheme(next);
-    document.documentElement.dataset.theme = resolvedDark(next) ? "dark" : "light";
-    const onTheme = (event: Event) => {
-      const mode = (event as CustomEvent<ThemeMode>).detail;
-      setTheme(mode);
-      document.documentElement.dataset.theme = resolvedDark(mode) ? "dark" : "light";
-    };
-    const onSystem = () => {
-      if (next === "system") document.documentElement.dataset.theme = resolvedDark("system") ? "dark" : "light";
-    };
-    window.addEventListener("routivity-theme-change", onTheme);
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", onSystem);
-    return () => {
-      window.removeEventListener("routivity-theme-change", onTheme);
-      window.matchMedia("(prefers-color-scheme: dark)").removeEventListener("change", onSystem);
-    };
+    document.documentElement.dataset.theme = "light";
+    window.localStorage.removeItem("routivity-theme");
   }, []);
 
   async function signOut() {
@@ -127,15 +105,8 @@ export function AppShell({ user, trips, initialTripId, initialView }: Props) {
     go("Trip Now");
   }
 
-  function toggleTheme() {
-    const next = dark ? "light" : "dark";
-    window.localStorage.setItem("routivity-theme", next);
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
-  }
-
   return (
-    <main className={`${dark ? "app dark" : "app"}${selectedTrip ? "" : " all-trips"}`}>
+    <main className={`app${selectedTrip ? "" : " all-trips"}`}>
       <div className="app-frame">
         <header className="topbar">
           {selectedTrip && (
@@ -150,7 +121,7 @@ export function AppShell({ user, trips, initialTripId, initialView }: Props) {
           )}
           {selectedTrip && <button className="brand-home" onClick={goToAllTrips} aria-label="Back to all trips">
             <Image
-              src={dark ? "/dark-mode-logo.png" : "/logo.png"}
+              src="/logo.png"
               alt="Routivity"
               width={112}
               height={41}
@@ -158,10 +129,6 @@ export function AppShell({ user, trips, initialTripId, initialView }: Props) {
             />
           </button>}
           <div className="top-actions">
-            {!selectedTrip && <button className="theme-circle" onClick={toggleTheme} aria-label={`Switch to ${dark ? "light" : "dark"} mode`}>
-              <span className={dark ? "theme-icon" : "theme-icon theme-icon-visible"}><Sun size={18} /></span>
-              <span className={dark ? "theme-icon theme-icon-visible" : "theme-icon"}><Moon size={18} /></span>
-            </button>}
             <button
               className={selectedTrip ? "avatar" : "avatar hub-avatar"}
               onClick={() => setProfileOpen((open) => !open)}
@@ -193,7 +160,7 @@ export function AppShell({ user, trips, initialTripId, initialView }: Props) {
               </svg>
             </div>
             <div className="hub-hero hub-entrance">
-              <Image className="hub-hero-logo" src={dark ? "/dark-mode-logo.png" : "/logo.png"} alt="routivity.ai" width={420} height={152} priority />
+              <Image className="hub-hero-logo" src="/logo.png" alt="routivity.ai" width={420} height={152} priority />
             </div>
             <div className="hub-action-grid">
               <Link className="hub-action-card add hub-entrance" href="/trips/new"><i><Plus size={15}/></i><span><b>ADD</b></span></Link>

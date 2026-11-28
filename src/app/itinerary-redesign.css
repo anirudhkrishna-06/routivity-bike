@@ -220,6 +220,10 @@
   border: 1px dashed #bdc8bd;
   background: transparent;
 }
+.commitment.done {
+  background: #e8ece8;
+  color: #526157;
+}
 .event-details {
   display: grid;
   max-height: 0;
@@ -260,6 +264,18 @@
   color: #285f48;
   text-decoration: none;
 }
+.event-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #285f48;
+  font: inherit;
+  cursor: pointer;
+}
+.live-location-consent.compact,.live-location-status.compact { margin: 0 0 14px; }
 .event-actions {
   display: flex;
   gap: 6px;
@@ -633,7 +649,8 @@
 .app.dark .travel-metric small,
 .app.dark .travel-points li { color: #b8c8bc; }
 .app.dark .travel-metric strong { color: #bde2c5; }
-@keyframes itinerary-overlay-in{from{opacity:0}to{opacity:1}}@keyframes itinerary-sheet-in{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}@keyframes place-menu-in{from{opacity:0;transform:translateY(-5px) scaleY(.96)}to{opacity:1;transform:none}}@keyframes place-spin{to{transform:rotate(360deg)}}
+@keyframes itinerary-overlay-in{from{opacity:0}to{opacity:1}}@keyframes itinerary-overlay-out{from{opacity:1}to{opacity:0}}@keyframes itinerary-sheet-in{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}@keyframes itinerary-sheet-out{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(10px) scale(.98)}}@keyframes place-menu-in{from{opacity:0;transform:translateY(-5px) scaleY(.96)}to{opacity:1;transform:none}}@keyframes place-spin{to{transform:rotate(360deg)}}
+.itinerary-overlay.closing{animation:itinerary-overlay-out .22s ease both}.itinerary-sheet.closing{animation:itinerary-sheet-out .22s cubic-bezier(.22,1,.36,1) both}.timeline-event.just-added{animation:timeline-event-added .55s cubic-bezier(.22,1,.36,1) both}@keyframes timeline-event-added{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
 @media (min-width: 1024px) {
   .itinerary-sheet {
     margin-left: auto;

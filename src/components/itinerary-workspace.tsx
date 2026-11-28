@@ -28,6 +28,8 @@ import {
   type ItineraryDay,
 } from "@/lib/itinerary/engine";
 import { LoadingScreen } from "./loading-screen";
+import { LiveLocationConsent } from "./live-location-consent";
+import { getLiveDirectionsUrl } from "@/lib/maps";
 
 type Activity = ItineraryActivity & {
   endTime?: string | null;
@@ -42,6 +44,8 @@ type Activity = ItineraryActivity & {
   originLon?: number | null;
   destinationLat?: number | null;
   destinationLon?: number | null;
+  locationLat?: number | null;
+  locationLon?: number | null;
 };
 type Panel = "menu" | "event" | "side" | "day" | "delete" | "conflict" | null;
 const initialForm = {
@@ -51,6 +55,8 @@ const initialForm = {
   startTime: "",
   endTime: "",
   location: "",
+  locationLat: "",
+  locationLon: "",
   origin: "",
   destination: "",
   notes: "",
@@ -89,7 +95,7 @@ function travelArrival(startTime: string, distanceKm: number) {
   return { time: hhmm(rounded % (24 * 60)), dayOffset: Math.floor(rounded / (24 * 60)) };
 }
 
-function PlaceInput({ label, value, onChange, onSelect }: { label: string; value: string; onChange: (value: string) => void; onSelect: (place: Place) => void }) {
+function PlaceInput({ label, value, context, onChange, onSelect }: { label: string; value: string; context?: string; onChange: (value: string) => void; onSelect: (place: Place) => void }) {
   const [results, setResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -105,7 +111,9 @@ function PlaceInput({ label, value, onChange, onSelect }: { label: string; value
     const controller = new AbortController();
     setLoading(true);
     const timer = window.setTimeout(() => {
-      fetch(`/api/geoapify?text=${encodeURIComponent(value)}`, { signal: controller.signal })
+      const params = new URLSearchParams({ text: value });
+      if (context?.trim()) params.set("context", context.trim());
+      fetch(`/api/geoapify?${params.toString()}`, { signal: controller.signal })
         .then((response) => response.json() as Promise<{ features?: { properties?: { formatted?: string; lat?: number; lon?: number } }[] }>)
         .then((body) => setResults((body.features || []).flatMap((feature) => {
           const item = feature.properties;
@@ -115,8 +123,14 @@ function PlaceInput({ label, value, onChange, onSelect }: { label: string; value
         .finally(() => { if (!controller.signal.aborted) { setLoading(false); setOpen(true); } });
     }, 280);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [value]);
+  }, [value, context]);
   return <div className="place-field"><label>{label}<span className="place-input-wrap"><input role="combobox" aria-expanded={open && results.length > 0} value={value} autoComplete="off" onFocus={() => { if (results.length > 0) setOpen(true); }} onChange={(event) => { selectedValue.current = ""; onChange(event.target.value); setOpen(true); }} />{loading && <i className="place-spinner" aria-hidden="true" />}</span></label>{open && results.length > 0 && <div className="place-results" role="listbox">{results.map((place) => <button type="button" role="option" key={`${place.label}-${place.lat}`} onMouseDown={(event) => event.preventDefault()} onClick={() => { selectedValue.current = place.label; setResults([]); setLoading(false); setOpen(false); onSelect(place); }}>{place.label}</button>)}</div>}{open && !loading && value.trim().length >= 2 && results.length === 0 && !selectedValue.current && <div className="place-results place-empty">No places found</div>}</div>;
+}
+
+function LiveDirectionsLink({ destination }: { destination: string }) {
+  const [loading, setLoading] = useState(false);
+  if (!destination) return null;
+  return <button type="button" className="event-map-link" onClick={() => { setLoading(true); void getLiveDirectionsUrl(destination).then((url) => window.open(url, "_blank", "noopener,noreferrer")).finally(() => setLoading(false)); }}><MapPin size={13} /> {loading ? "Locating…" : "Directions"} <ExternalLink size={11} /></button>;
 }
 function dateLabel(value: string, long = false) {
   return new Intl.DateTimeFormat("en-IN", {
@@ -124,6 +138,10 @@ function dateLabel(value: string, long = false) {
     day: "numeric",
     month: "short",
   }).format(new Date(`${value}T00:00:00`));
+}
+
+function cityLabel(value?: string | null) {
+  return value?.split(",")[0]?.trim() || "";
 }
 function timeLabel(value?: string | null) {
   return value
@@ -185,7 +203,7 @@ function AnimatedDistance({ value, active }: { value: number; active: boolean })
   return <strong>{Math.round(displayValue).toLocaleString("en-IN")} km</strong>;
 }
 
-function TravelInsights({ item, active }: { item: Activity; active: boolean }) {
+export function TravelInsights({ item, active }: { item: { notes?: string | null; distanceKmMilli?: number | null }; active: boolean }) {
   const parsed = parseTravelDetails(item.notes);
   const distanceKm = parsed.distanceKm ?? (item.distanceKmMilli ? item.distanceKmMilli / 1000 : undefined);
   const points = parsed.points;
@@ -256,6 +274,8 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
   const [deleteTarget, setDeleteTarget] = useState<Activity>();
   const [conflictTarget, setConflictTarget] = useState<ItineraryActivity>();
   const [toast, setToast] = useState<{ message: string; undo: () => void }>();
+  const [closing, setClosing] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string>();
   const cacheKey = `routivity-itinerary-${tripId}`;
   const day = days.find((item) => item.dayNumber === selectedDay) || days[0];
   const items = useMemo(
@@ -270,11 +290,11 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
     [activities, selectedDay],
   );
   const destination = day
-    ? dayDestination(
+    ? cityLabel(dayDestination(
         day,
         activities,
         days.find((item) => item.dayNumber === selectedDay - 1)?.location ?? undefined,
-      )
+      ))
     : "";
   const windows = useMemo(() => freeWindows(items), [items]);
   const suggestions = useMemo(
@@ -284,7 +304,12 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
   const stays = useMemo(() => stayBands(days, activities), [days, activities]);
   const affectedStay = stays.find((stay) => addAfter >= stay.checkInDay && addAfter < stay.checkOutDay);
   function showToast(message: string, undo: () => void) { setToast({ message, undo }); window.setTimeout(() => setToast(undefined), 8000); }
-  async function load() {
+  function closePanel() {
+    if (!panel || closing) return;
+    setClosing(true);
+    window.setTimeout(() => { setPanel(null); setClosing(false); }, 220);
+  }
+  async function load(preserveSelectedDay = false) {
     try {
       const response = await fetch(`/api/trips/${tripId}/activities`, {
         cache: "no-store",
@@ -298,12 +323,10 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
         throw new Error(body.error || "Couldn't load your itinerary.");
       setActivities(body.activities || []);
       setDays(body.days || []);
-      const today = new Date().toISOString().slice(0, 10);
-      setSelectedDay(
-        (body.days || []).find((item) => item.date === today)?.dayNumber ||
-          body.days?.[0]?.dayNumber ||
-          1,
-      );
+      if (!preserveSelectedDay) {
+        const today = new Date().toISOString().slice(0, 10);
+        setSelectedDay((body.days || []).find((item) => item.date === today)?.dayNumber || body.days?.[0]?.dayNumber || 1);
+      }
       setMessage("Look out for the plan below!");
       setReady(true);
       window.localStorage.setItem(
@@ -379,6 +402,8 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
         startTime: item.startTime || "",
         endTime: item.endTime || "",
         location: item.location || "",
+        locationLat: item.locationLat ? String(item.locationLat) : "",
+        locationLon: item.locationLon ? String(item.locationLon) : "",
         origin: item.origin || "",
         destination: item.destination || "",
         notes: item.notes || "",
@@ -401,11 +426,12 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
         date: day?.date || "",
         startTime: hhmm(from),
         endTime: hhmm(end ?? from + 60),
-        location: destination,
+        location: "",
         origin: days.find((candidate) => candidate.dayNumber === selectedDay - 1)?.location || days[0]?.location || "",
       });
     }
     setError("");
+    setClosing(false);
     setPanel("event");
   }
   function update(key: string, value: string) {
@@ -450,6 +476,9 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
       startTime: form.startTime || undefined,
       endTime: form.endTime || undefined,
       location: form.location || undefined,
+      locationLat: form.locationLat ? Number(form.locationLat) : undefined,
+      locationLon: form.locationLon ? Number(form.locationLon) : undefined,
+      mapsUrl: form.location && !form.locationLat ? "" : undefined,
       origin: form.origin || undefined,
       destination: form.destination || undefined,
       notes: form.notes || undefined,
@@ -483,10 +512,14 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
       setError(body.error || "Couldn't save. Your entry is kept.");
       return;
     }
-    setPanel(null);
     const undoId = previous?.id || body.id;
-    if (undoId) showToast(previous ? "Event saved" : "Event added", () => { void fetch(`/api/trips/${tripId}/activities`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: previous ? "update" : "delete", payload: previous ? { activityId: undoId, idempotencyKey: crypto.randomUUID(), change: previous } : { activityId: undoId, idempotencyKey: crypto.randomUUID() } }) }).then(load); });
-    await load();
+    if (undoId) {
+      setHighlightedId(undoId);
+      window.setTimeout(() => setHighlightedId(undefined), 700);
+    }
+    if (undoId) showToast(previous ? "Event saved" : "Event added", () => { void fetch(`/api/trips/${tripId}/activities`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: previous ? "update" : "delete", payload: previous ? { activityId: undoId, idempotencyKey: crypto.randomUUID(), change: previous } : { activityId: undoId, idempotencyKey: crypto.randomUUID() } }) }).then(() => load()); });
+    closePanel();
+    await load(true);
   }
   async function itemAction(operation: "duplicate" | "delete", item: Activity) {
     if (!online) return;
@@ -510,9 +543,9 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
     else {
       setExpanded(undefined);
       const changedId = body.id || body.activityId || item.id;
-      if (operation === "duplicate") showToast("Event duplicated", () => { void fetch(`/api/trips/${tripId}/activities`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "delete", payload: { activityId: changedId, idempotencyKey: crypto.randomUUID() } }) }).then(load); });
-      if (operation === "delete") showToast("Event deleted", () => { void fetch(`/api/trips/${tripId}/activities`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "restore", payload: { activityId: item.id, idempotencyKey: crypto.randomUUID() } }) }).then(load); });
-      await load();
+      if (operation === "duplicate") showToast("Event duplicated", () => { void fetch(`/api/trips/${tripId}/activities`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "delete", payload: { activityId: changedId, idempotencyKey: crypto.randomUUID() } }) }).then(() => load()); });
+      if (operation === "delete") showToast("Event deleted", () => { void fetch(`/api/trips/${tripId}/activities`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "restore", payload: { activityId: item.id, idempotencyKey: crypto.randomUUID() } }) }).then(() => load()); });
+      await load(true);
     }
   }
   function chooseConflict(option: "shorten" | "shift" | "another") {
@@ -530,7 +563,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
     const response = await fetch(`/api/trips/${tripId}/activities`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "delete", payload: { activityId: deleteTarget.id, idempotencyKey: crypto.randomUUID(), resolution: { mode, targetActivityId } } }) });
     const body = (await response.json()) as { error?: string }; setBusy(false);
     if (!response.ok) { setError(body.error || "Unable to remove event."); return; }
-    setDeleteTarget(undefined); setPanel(null); await load();
+    setDeleteTarget(undefined); setPanel(null); await load(true);
   }
   async function addDay() {
     if (!online) return;
@@ -541,7 +574,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
       if (!apply.ok) { setError(((await apply.json()) as { error?: string }).error || "Unable to add the day."); return; }
       const newDay = dayProposal.diff.added.dayNumber;
       if (extendStay && affectedStay) { await fetch(`/api/trips/${tripId}/activities`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "update", payload: { activityId: affectedStay.activityId, idempotencyKey: crypto.randomUUID(), change: { stayNights: affectedStay.nights + 1 } } }) }); }
-      const appliedProposalId = dayProposal.id; showToast("Day added", () => { void fetch(`/api/trips/${tripId}/schedule`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "undo", proposalId: appliedProposalId }) }).then(load); }); setDayProposal(undefined); setPanel(null); await load(); setSelectedDay(newDay); return;
+      const appliedProposalId = dayProposal.id; showToast("Day added", () => { void fetch(`/api/trips/${tripId}/schedule`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "undo", proposalId: appliedProposalId }) }).then(() => load()); }); setDayProposal(undefined); setPanel(null); await load(); setSelectedDay(newDay); return;
     }
     const response = await fetch(`/api/trips/${tripId}/schedule`, {
       method: "POST",
@@ -577,6 +610,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
         </div>
         
       </div>
+      <LiveLocationConsent compact />
       
       {!online && <div className="itinerary-error">Viewing saved itinerary. Reconnect to edit.</div>}
       <div className="day-rail" role="tablist">
@@ -584,7 +618,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
           const count = activities.filter(
             (activity) => activity.dayNumber === item.dayNumber,
           ).length;
-          const place = dayDestination(item, activities);
+          const place = cityLabel(dayDestination(item, activities));
           return (
             <button
               key={item.id}
@@ -641,7 +675,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
             )}
             {items.map((item) => (
               <article
-                className={`timeline-event ${item.type.toLowerCase()} ${expanded === item.id ? "expanded" : ""}`}
+                className={`timeline-event ${item.type.toLowerCase()} ${expanded === item.id ? "expanded" : ""} ${highlightedId === item.id ? "just-added" : ""}`}
                 key={item.id}
               >
                 <button
@@ -665,9 +699,9 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                     </small>
                   </span>
                   <span
-                    className={`commitment ${String(item.commitment || "PLANNED").toLowerCase()}`}
+                    className={`commitment ${item.status === "done" ? "done" : String(item.commitment || "PLANNED").toLowerCase()}`}
                   >
-                    {String(item.commitment || "PLANNED").toLowerCase()}
+                    {item.status === "done" ? "done" : String(item.commitment || "PLANNED").toLowerCase()}
                   </span>
                 </button>
                 <div className={`event-details ${expanded === item.id ? "open" : ""}`} aria-hidden={expanded !== item.id}>
@@ -681,12 +715,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                         {item.travelMode || "Travel"}
                       </small>
                     )}
-                    {item.mapsUrl && (
-                      <a href={item.mapsUrl} target="_blank" rel="noreferrer">
-                        <MapPin size={13} /> Open in Maps{" "}
-                        <ExternalLink size={11} />
-                      </a>
-                    )}
+                    {(item.destination || item.mapsUrl) && <LiveDirectionsLink destination={item.destination || item.location || ""} />}
                     <div className="event-actions">
                       <button onClick={() => openEvent(item)}>
                         <Pencil size={13} /> Edit
@@ -713,13 +742,13 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
       {toast && <div className="undo-toast" role="status"><span>{toast.message}</span><button onClick={() => { toast.undo(); setToast(undefined); }}>Undo</button></div>}
       {panel && typeof document !== "undefined" && createPortal((
         <div
-          className="itinerary-overlay"
+          className={`itinerary-overlay ${closing ? "closing" : ""}`}
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setPanel(null);
+            if (event.target === event.currentTarget) closePanel();
           }}
         >
-          <div className="itinerary-sheet itinerary-modal" role="dialog" aria-modal="true">
-            <header className="itinerary-modal-header"><h2>{panel === "menu" ? "Add" : editing ? `Edit ${form.type === "TRAVEL" ? "Travel" : form.type === "STAY" ? "Stay" : "Event"}` : `Add ${form.type === "TRAVEL" ? "Travel" : form.type === "STAY" ? "Stay" : "Event"}`}</h2><button className="sheet-close" onClick={() => setPanel(null)} aria-label="Close"><X size={18} /></button></header>
+          <div className={`itinerary-sheet itinerary-modal ${closing ? "closing" : ""}`} role="dialog" aria-modal="true">
+            <header className="itinerary-modal-header"><h2>{panel === "menu" ? "Add" : editing ? `Edit ${form.type === "TRAVEL" ? "Travel" : form.type === "STAY" ? "Stay" : "Event"}` : `Add ${form.type === "TRAVEL" ? "Travel" : form.type === "STAY" ? "Stay" : "Event"}`}</h2><button className="sheet-close" onClick={closePanel} aria-label="Close"><X size={18} /></button></header>
             {panel === "menu" && (
               <>
                 
@@ -780,9 +809,9 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
             )}
             {panel === "event" && (
               <div className="event-form activity-event-form">
-                {form.type !== "TRAVEL" && <input
+                {form.type === "STAY" && <input
                   autoFocus
-                  placeholder={form.type === "STAY" ? "Hotel name (optional)" : "Event name"}
+                  placeholder="Hotel name (optional)"
                   value={form.title}
                   onChange={(e) => update("title", e.target.value)}
                 />}
@@ -835,7 +864,7 @@ export function ItineraryWorkspace({ tripId }: { tripId: string }) {
                   </>
                 )}
                 {form.type === "TRAVEL" && <div className={`travel-route-status ${routeStatus}`}><span>{routeStatus === "loading" ? "Calculating route" : routeStatus === "error" ? "Route unavailable" : "Route distance"}</span><b>{form.distanceKm ? `${Number(form.distanceKm).toFixed(1)} km` : routeStatus === "loading" ? "…" : "—"}</b></div>}
-                {form.type === "STAY" && <label>Location<input placeholder={destination || "Location"} value={form.location} onChange={(e) => update("location", e.target.value)} /></label>}
+                {form.type !== "TRAVEL" && form.type !== "STAY" && <PlaceInput label="Place" context={destination} value={form.location} onChange={(value) => setForm((old) => ({ ...old, title: value, location: value, locationLat: "", locationLon: "" }))} onSelect={(place) => setForm((old) => ({ ...old, title: place.label, location: place.label, locationLat: String(place.lat), locationLon: String(place.lon) }))} />}
                 {false && <label>
                   Commitment
                   <select

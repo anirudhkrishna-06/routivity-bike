@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   index,
   jsonb,
+  doublePrecision,
 } from "drizzle-orm/pg-core";
 
 export const memberStatus = pgEnum("member_status", ["active", "inactive"]);
@@ -185,6 +186,8 @@ export const activities = pgTable(
     origin: text("origin"),
     destination: text("destination"),
     location: text("location"),
+    locationLat: doublePrecision("location_lat"),
+    locationLon: doublePrecision("location_lon"),
     mapsUrl: text("maps_url"),
     viaPoints: text("via_points"),
     distanceKmMilli: integer("distance_km_milli"),
@@ -455,6 +458,44 @@ export const mutations = pgTable("mutations", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
+});
+
+export const tripWatchShares = pgTable(
+  "trip_watch_shares",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tripId: uuid("trip_id").references(() => trips.id).notNull(),
+    tokenHash: varchar("token_hash", { length: 128 }).notNull().unique(),
+    passcodeHash: text("passcode_hash").notNull(),
+    recipientLabel: varchar("recipient_label", { length: 80 }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    active: boolean("active").default(true).notNull(),
+    lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ tripIdx: index("trip_watch_shares_trip_idx").on(table.tripId) }),
+);
+
+export const tripWatchSessions = pgTable(
+  "trip_watch_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    shareId: uuid("share_id").references(() => tripWatchShares.id).notNull(),
+    sessionHash: varchar("session_hash", { length: 128 }).notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ shareIdx: index("trip_watch_sessions_share_idx").on(table.shareId) }),
+);
+
+export const tripMemberLocations = pgTable("trip_member_locations", {
+  participantId: uuid("participant_id").references(() => participants.id).primaryKey(),
+  latitude: text("latitude").notNull(),
+  longitude: text("longitude").notNull(),
+  accuracyMeters: integer("accuracy_meters"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+  locality: varchar("locality", { length: 160 }),
 });
 
 export const restructuringProposals = pgTable("restructuring_proposals", {

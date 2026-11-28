@@ -39,6 +39,8 @@ type ActivityInput = {
   origin?: string;
   destination?: string;
   location?: string;
+  locationLat?: number;
+  locationLon?: number;
   viaPoints?: string;
   mapsUrl?: string;
   distanceKmMilli?: number;
@@ -452,6 +454,8 @@ export async function listTripActivities(tripId: string) {
       origin: activities.origin,
       destination: activities.destination,
       location: activities.location,
+      locationLat: activities.locationLat,
+      locationLon: activities.locationLon,
       mapsUrl: activities.mapsUrl,
       notes: activities.notes,
       commitment: activities.commitment,
@@ -670,6 +674,8 @@ export async function createActivity(input: {
         origin: input.activity.origin,
         destination: input.activity.destination,
         location: input.activity.location,
+        locationLat: input.activity.locationLat,
+        locationLon: input.activity.locationLon,
         viaPoints: input.activity.viaPoints,
         mapsUrl: buildMapsUrl(input.activity),
         notes: input.activity.notes,
@@ -706,6 +712,19 @@ export async function updateActivity(input: {
 }) {
   const { user } = await member(input.tripId);
   if (!db) throw new Error("Database is not configured");
+  const existingMutation = await db.query.mutations.findFirst({ where: eq(mutations.idempotencyKey, input.idempotencyKey) });
+  if (existingMutation) return JSON.parse(existingMutation.result);
+  if (Object.keys(input.change).length === 1 && input.change.status) {
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(activities).set({ status: input.change.status, updatedAt: new Date() }).where(and(eq(activities.id, input.activityId), eq(activities.tripId, input.tripId), eq(activities.archived, false))).returning({ id: activities.id, status: activities.status });
+      if (!updated) throw new Error("Activity not found");
+      await audit(tx, input.tripId, user.id, "updated", input.activityId, input.change);
+      await tx.insert(mutations).values({ idempotencyKey: input.idempotencyKey, tripId: input.tripId, actorId: user.id, result: JSON.stringify(updated) });
+      return updated;
+    });
+    await invalidateTripCache(input.tripId);
+    return result;
+  }
   const current = await db.query.activities.findFirst({
     where: and(
       eq(activities.id, input.activityId),
@@ -745,11 +764,13 @@ export async function updateActivity(input: {
         origin: input.change.origin ?? current.origin,
         destination: input.change.destination ?? current.destination,
         location: input.change.location ?? current.location,
+        locationLat: input.change.locationLat ?? current.locationLat,
+        locationLon: input.change.locationLon ?? current.locationLon,
         viaPoints: input.change.viaPoints ?? current.viaPoints,
         mapsUrl: buildMapsUrl({
           ...current,
           ...input.change,
-          mapsUrl: current.mapsUrl ?? undefined,
+          mapsUrl: input.change.mapsUrl !== undefined ? input.change.mapsUrl : current.mapsUrl ?? undefined,
           origin: current.origin ?? undefined,
           destination: current.destination ?? undefined,
           location: current.location ?? undefined,

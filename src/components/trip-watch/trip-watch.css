@@ -1,0 +1,168 @@
+.trip-watch-page{min-height:100svh;background:#f7f7f2;color:#19231d}.trip-watch-content{width:min(100%,760px);margin:auto;padding:0 14px 46px}.trip-watch-brand{width:min(100%,760px);margin:auto;padding:24px 14px 16px;display:flex;justify-content:space-between;align-items:baseline}.trip-watch-brand span{font:400 27px "Architects Daughter",cursive;color:#285f48}.trip-watch-brand small,.trip-watch-eyebrow{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#778178;font-weight:800}.trip-watch-live,.trip-watch-map-section,.trip-watch-itinerary{background:#fffefa;border:1px solid #e6e9e1;border-radius:26px;margin-bottom:14px;overflow:hidden;box-shadow:0 8px 28px #234d3e0b}.trip-watch-live{background:linear-gradient(145deg,#e5f0e6,#fffefa 60%)}.trip-watch-live-head{display:flex;justify-content:space-between;gap:10px;padding:16px 18px;border-bottom:1px solid #dce8dc;font-size:9px;letter-spacing:1px;color:#285f48;font-weight:800}.trip-watch-live-head span:last-child{display:flex;gap:4px;align-items:center;color:#778178;letter-spacing:0;font-weight:600}.trip-watch-live-body{min-height:280px;display:grid;grid-template-columns:1fr 42%;padding:24px 20px 0}.trip-watch-live-copy{z-index:1}.trip-watch-live h1{font:400 clamp(30px,7vw,48px)/.98 "Architects Daughter",cursive;margin:9px 0 13px;max-width:450px}.trip-watch-live-copy>p:not(.trip-watch-eyebrow){font-size:13px;line-height:1.55;color:#5f6d63;max-width:390px}.trip-watch-route{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:#285f48;margin-top:20px}.trip-watch-route i{height:1px;background:#9fc1a6;flex:1;max-width:45px}.trip-watch-stay,.trip-watch-live-copy>small{display:flex;align-items:center;gap:7px;color:#285f48;font-size:11px;margin-top:18px}.trip-watch-art{position:relative;min-height:220px}.trip-watch-bike{position:absolute;width:150px;height:150px;right:-12px;bottom:48px;z-index:2}.trip-watch-road{position:absolute;width:250px;height:130px;right:-35px;bottom:4px;opacity:.9}.trip-watch-house{width:190px;height:190px;position:absolute;right:-10px;bottom:20px}.trip-watch-sun{width:130px;height:130px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#f6c75f,#e8794a);position:absolute;right:15px;top:25px;opacity:.8}.trip-watch-readonly{margin:0;padding:10px 18px 14px;color:#778178;font-size:9px}.trip-watch-map-section,.trip-watch-itinerary{padding:20px}.trip-watch-section-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}.trip-watch-section-heading h2{font:400 30px/1.05 "Architects Daughter",cursive;margin:5px 0 0}.trip-watch-location-pin{display:flex;align-items:center;gap:5px;background:#e5f0e6;color:#285f48;border-radius:99px;padding:7px 10px;font-size:9px;font-weight:800}.trip-watch-map-frame{margin:18px -4px 0;border-radius:18px;overflow:hidden;border:1px solid #dfe7dc;position:relative;background:#edf3ed}.trip-watch-map-frame iframe{display:block;width:100%;height:280px;border:0}.trip-watch-map-frame a{position:absolute;right:10px;bottom:10px;background:#fffefa;color:#285f48;border-radius:9px;padding:7px 9px;font-size:9px;font-weight:800;text-decoration:none;box-shadow:0 2px 8px #19231d22}.trip-watch-map-meta{font-size:10px;line-height:1.5;color:#778178;margin:12px 0 0}.trip-watch-map-empty{padding:32px 12px;text-align:center;color:#778178}.trip-watch-map-empty svg{color:#285f48}.trip-watch-map-empty h2{font:400 25px "Architects Daughter",cursive;color:#19231d;margin:10px 0 6px}.trip-watch-map-empty p{font-size:11px;line-height:1.5;max-width:450px;margin:auto}.trip-watch-days{display:flex;gap:8px;overflow:auto;margin:20px -4px 18px;padding:0 4px 5px;scrollbar-width:none}.trip-watch-days button{flex:0 0 118px;text-align:left;border:1px solid #e1e8df;background:#f7f7f2;border-radius:16px;padding:11px;color:#667269}.trip-watch-days button.selected{background:#285f48;border-color:#285f48;color:#fff}.trip-watch-days b,.trip-watch-days span,.trip-watch-days small{display:block}.trip-watch-days b{font-size:11px}.trip-watch-days span{font-size:9px;margin-top:5px}.trip-watch-days small{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:6px;opacity:.8}.trip-watch-day-title{display:flex;align-items:baseline;gap:10px;border-bottom:1px solid #e6e9e1;padding-bottom:11px}.trip-watch-day-title span{font-size:9px;letter-spacing:1px;color:#285f48;font-weight:900}.trip-watch-day-title h3{font:400 22px "Architects Daughter",cursive;margin:0}.trip-watch-item{border-bottom:1px solid #e6e9e1}.trip-watch-item>button{width:100%;border:0;background:transparent;display:grid;grid-template-columns:56px 28px 1fr auto;gap:9px;align-items:center;text-align:left;padding:14px 0;color:#19231d}.trip-watch-time{font-size:10px;color:#778178}.trip-watch-type{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#e5f0e6;color:#285f48}.trip-watch-item:nth-child(odd) .trip-watch-type{background:#fff0df;color:#b86535}.trip-watch-item b,.trip-watch-item small{display:block}.trip-watch-item b{font-size:12px}.trip-watch-item small{font-size:10px;color:#778178;margin-top:3px}.trip-watch-item>button>svg{color:#778178;transition:transform .2s}.trip-watch-item.open>button>svg{transform:rotate(180deg)}.trip-watch-item-details{margin:-3px 0 14px 93px;padding:10px 12px;background:#f7f7f2;border-radius:12px;color:#667269;font-size:10px;line-height:1.5}.trip-watch-item-details p{margin:4px 0;display:flex;align-items:center;gap:5px}.trip-watch-empty-day{font-size:11px;color:#778178;padding:22px 0}.trip-watch-footer{text-align:center;color:#778178;font-size:9px;padding:0 20px 30px}.trip-watch-access,.trip-watch-loading{min-height:100svh;display:grid;place-items:center;padding:20px;background:radial-gradient(circle at 50% 0,#e5f0e6,#f7f7f2 45%);color:#19231d}.trip-watch-access-card{width:min(100%,420px);background:#fffefa;border:1px solid #e6e9e1;border-radius:28px;padding:30px 24px;box-shadow:0 16px 50px #234d3e12}.trip-watch-mark{width:48px;height:48px;display:grid;place-items:center;border-radius:16px;background:#e5f0e6;color:#285f48}.trip-watch-access h1,.trip-watch-loading h1{font:400 37px/1 "Architects Daughter",cursive;margin:10px 0 12px}.trip-watch-access-card>p:not(.trip-watch-eyebrow),.trip-watch-loading p{font-size:13px;line-height:1.55;color:#667269}.trip-watch-access form{margin-top:24px}.trip-watch-access label{display:block;font-size:11px;font-weight:800;margin-bottom:7px}.trip-watch-password{display:flex;border:1px solid #dce5da;border-radius:12px;overflow:hidden}.trip-watch-password input{min-width:0;flex:1;border:0;background:transparent;padding:13px;font-size:12px;outline:none}.trip-watch-password button{border:0;background:transparent;color:#285f48;padding:0 13px;font-size:9px;font-weight:400}.trip-watch-primary{width:100%;border:0;font-size:12px;border-radius:32px;background:#000;color:white;padding:13px;margin-top:12px;font-weight:300}.trip-watch-primary:disabled{opacity:.6}.trip-watch-access-card>small{display:flex;gap:5px;align-items:center;margin-top:18px;color:#778178;font-size:9px}.trip-watch-error{color:#a43c2d;font-size:10px;padding-top:9px}.trip-watch-loading{display:flex;flex-direction:column;gap:10px;text-align:center}.trip-watch-loading>span{width:22px;height:22px;border:3px solid #cce0d0;border-top-color:#285f48;border-radius:50%;animation:trip-watch-spin .8s linear infinite}@keyframes trip-watch-spin{to{transform:rotate(360deg)}}@media(max-width:520px){.trip-watch-live-body{grid-template-columns:1fr;min-height:440px}.trip-watch-art{position:absolute;right:14px;bottom:82px;width:46%;height:170px;min-height:0}.trip-watch-live-copy{padding-right:18px}.trip-watch-bike{width:120px;height:120px}.trip-watch-road{width:200px;height:100px}.trip-watch-house{width:150px;height:150px}.trip-watch-item>button{grid-template-columns:45px 28px 1fr auto}.trip-watch-item-details{margin-left:73px}}
+@media(prefers-reduced-motion:reduce){.trip-watch-loading>span{animation:none}}
+.trip-watch-settings-card{margin-bottom:14px}.trip-watch-create-button{display:flex;align-items:center;gap:7px;border:0;border-radius:41px;background:#000;margin-top:10px;margin-left:40px;color:#fff;padding:10px 13px;font-size:11px;font-weight:400}.trip-watch-share-list{display:grid;gap:8px;margin-top:15px}.trip-watch-share-row{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid #edf0eb;padding-top:10px}.trip-watch-share-row span{display:grid;gap:3px}.trip-watch-share-row b{font-size:11px}.trip-watch-share-row small{font-size:9px;color:#778178}.trip-watch-share-row button,.trip-watch-modal-head button{border:0;background:transparent;color:#a43c2d;padding:7px}.trip-watch-settings-modal{position:fixed;inset:0;z-index:30;background:#17231e66;display:flex;align-items:flex-end;justify-content:center;padding:0 12px}.trip-watch-settings-dialog{width:min(100%,520px);background:#fffefa;border-radius:24px 24px 0 0;padding:22px;box-shadow:0 -15px 40px #17231e30}.trip-watch-modal-head{display:flex;justify-content:space-between;align-items:center}.trip-watch-modal-head h3{font:400 12px "Architects Daughter",cursive;margin:0}.trip-watch-settings-dialog>p{color:#667269;font-size:11px;line-height:1.5}.trip-watch-settings-dialog label{display:grid;gap:6px;color:#526157;font-size:10px;font-weight:800;margin-top:12px}.trip-watch-settings-dialog input{border:1px solid #dfe5dc;border-radius:41px;padding:11px;background:transparent;color:inherit;font-size:12px}.trip-watch-created-url{display:grid;gap:10px;background:#eef6ef;border-radius:13px;padding:12px}.trip-watch-created-url code{word-break:break-all;color:#285f48;font-size:10px}.trip-watch-created-url button{display:flex;align-items:center;justify-content:center;gap:5px;border:0;border-radius:10px;background:#285f48;color:#fff;padding:10px;font-weight:800;font-size:10px}.trip-watch-success{display:flex;align-items:center;gap:5px;color:#285f48;font-size:10px;margin-top:12px}.trip-watch-form-error{color:#a43c2d!important;font-size:10px!important;margin:9px 0!important}
+
+/* Share creation follows the centered expense/itinerary modal treatment. */
+.trip-watch-settings-modal {
+  align-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 19, .58);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: trip-watch-overlay-in .22s ease both;
+}
+.trip-watch-settings-dialog {
+  max-height: min(88vh, 88dvh);
+  overflow: auto;
+  border-radius: 20px;
+  box-shadow: 0 16px 50px #19231d33;
+  animation: trip-watch-dialog-in .28s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes trip-watch-overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes trip-watch-dialog-in { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .trip-watch-settings-modal, .trip-watch-settings-dialog { animation: none; } }
+
+/* The shared view is deliberately a clean sans-serif reading surface. */
+.trip-watch-page,
+.trip-watch-page *,
+.trip-watch-access,
+.trip-watch-access *,
+.trip-watch-loading,
+.trip-watch-loading * {
+  font-family: var(--font-sf) !important;
+}
+.trip-watch-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.trip-watch-content > * {
+  margin-bottom: 0 !important;
+}
+@media (max-width: 760px) {
+  .trip-watch-page { width: 100vw; min-width: 320px; overflow-x: hidden; }
+  .trip-watch-brand,
+  .trip-watch-content { width: 100%; max-width: none; }
+  .trip-watch-brand { padding: 18px 16px 12px; }
+  .trip-watch-content { padding: 0 12px 36px; }
+  .trip-watch-content .lively-container { width: 100%; min-width: 0; }
+  .trip-watch-map-section { width: 100%; }
+}
+.trip-watch-brand img {
+  display: block;
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+}
+.trip-watch-brand { position: relative; }
+.trip-watch-refresh { position: absolute; top: 4px; right: 0; border: 0; background: transparent; color: #285f48; padding: 4px; display: grid; place-items: center; cursor: pointer; }
+.trip-watch-refresh.refreshing svg { animation: trip-watch-refresh-spin .75s linear infinite; }
+@keyframes trip-watch-refresh-spin { to { transform: rotate(360deg); } }
+.trip-watch-itinerary.new-itinerary {
+  max-width: none;
+  padding: 20px;
+}
+.trip-watch-itinerary .itinerary-top h1 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  margin: 6px 0 4px;
+}
+.trip-watch-itinerary .itinerary-top p {
+  margin: 0;
+  color: #778178;
+  font-size: 12px;
+}
+.trip-watch-itinerary .day-header h2 {
+  font-size: 22px;
+  font-weight: 600;
+}
+.trip-watch-itinerary .event-details a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  color: #285f48;
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.trip-watch-itinerary.new-itinerary {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  padding: 24px 0 50px;
+}
+.trip-watch-itinerary .itinerary-top h1 {
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -1.5px;
+}
+.trip-watch-map-debug {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px dashed #d58b4a;
+  border-radius: 12px;
+  background: #fff7e9;
+  color: #6b5438;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.trip-watch-map-debug > div:first-child,
+.trip-watch-map-debug > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.trip-watch-map-debug code { font-size: 9px; }
+.trip-watch-map-debug button,
+.trip-watch-map-debug a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #285f48;
+  color: #fff;
+  font-size: 9px;
+  text-decoration: none;
+}
+.trip-watch-map-debug a { background: transparent; color: #285f48; }
+
+.settings-stagger:has(.trip-watch-settings-modal) {
+  transform: none !important;
+  animation: none !important;
+  opacity: 1 !important;
+}
+.trip-watch-settings-dialog {
+  width: min(92vw, 560px);
+  max-height: min(88vh, 88dvh);
+  padding: 20px;
+  border-radius: 26px;
+}
+.trip-watch-modal-head h3 {
+  font: 700 18px/1.1 var(--font-sf);
+  letter-spacing: -.5px;
+}
+.trip-watch-modal-head button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #eff2ec;
+  color: #526058;
+  font-size: 0;
+}
+.trip-watch-modal-head button::after {
+  content: "×";
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 400;
+}

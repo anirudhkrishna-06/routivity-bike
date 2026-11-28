@@ -6,12 +6,29 @@ export async function GET(request: Request) {
   try {
     if (!apiKey) throw new Error("Geoapify is not configured");
     const key = apiKey;
-    const text = new URL(request.url).searchParams.get("text")?.trim();
+    const params = new URL(request.url).searchParams;
+    const text = params.get("text")?.trim();
+    const context = params.get("context")?.trim();
     if (!text || text.length < 2) return NextResponse.json({ features: [] });
     const url = new URL("https://api.geoapify.com/v1/geocode/autocomplete");
     url.searchParams.set("text", text);
     url.searchParams.set("limit", "5");
     url.searchParams.set("format", "geojson");
+    if (context) {
+      const contextSearch = new URL("https://api.geoapify.com/v1/geocode/search");
+      contextSearch.searchParams.set("text", context);
+      contextSearch.searchParams.set("limit", "1");
+      contextSearch.searchParams.set("apiKey", apiKey);
+      const contextResponse = await fetch(contextSearch, { next: { revalidate: 3600 } });
+      const contextBody = await contextResponse.json() as { features?: { properties?: { lat?: number; lon?: number } }[] };
+      const point = contextBody.features?.[0]?.properties;
+      if (point?.lat !== undefined && point.lon !== undefined) {
+        url.searchParams.set("bias", `proximity:${point.lon},${point.lat}`);
+        // Keep generic searches inside the active day's local area. Proximity
+        // bias alone can still return a famous place from another city.
+        url.searchParams.set("filter", `circle:${point.lon},${point.lat},40000`);
+      }
+    }
     url.searchParams.set("apiKey", apiKey);
     const response = await fetch(url, { next: { revalidate: 300 } });
     if (!response.ok) throw new Error("Unable to search places");

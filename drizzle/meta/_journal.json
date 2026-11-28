@@ -71,6 +71,20 @@
       "when": 1795420795820,
       "tag": "0009_strong_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795847599747,
+      "tag": "0010_fearless_sharon_ventura",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795859293461,
+      "tag": "0011_omniscient_captain_britain",
+      "breakpoints": true
     }
   ]
 }

@@ -69,8 +69,8 @@ html[data-theme="dark"] .join-candidate.selected { background: #254333; }
 .settings-page .members-card>p { font-size: 10px; line-height: 1.35; margin-bottom: 10px; }
 .settings-page .member-list { margin: 10px 0; }
 .settings-page .member-line { padding: 8px 0; }
-.settings-page .share-code-card { padding: 11px; margin-top: 10px; }
-.settings-page .share-code-card h2 { font-size: 17px; }
+.settings-page .share-code-card { padding: 11px; margin-top: 10px; border-radius: 30px;}
+.settings-page .share-code-card h2 { font-size: 14px; }
 .settings-page .share-code-card p { display: none; }
 @media (max-width: 460px) { .hub-action-card { min-height: 66px; padding: 12px; } .hub-action-card b { font-size: 11px; } .hub-action-card small { font-size: 8px; } }
 

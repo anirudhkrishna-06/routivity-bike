@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "../components/app-shell.css";
+import "../components/settings-panel.css";
+import "../components/lively-container.css";
 import "../components/itinerary-workspace.css";
 import "./phase2-overrides.css";
 import "./auth.css";
@@ -23,7 +25,22 @@ import "./fuel-intelligence.css";
 import "./activity-editor.css";
 import "./itinerary-redesign.css";
 import "./layout-polish.css";
+import "../components/trip-watch/trip-watch.css";
 import { OfflineBanner } from "../components/offline-banner";
+
+import { Patrick_Hand, Space_Grotesk } from "next/font/google";
+
+const patrickHand = Patrick_Hand({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-journal",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  weight: ["500", "700"],
+  subsets: ["latin"],
+  variable: "--font-display",
+});
 
 export const metadata: Metadata = {
   title: "Routivity — trips that stay together",

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+html,
+:root {
+  color-scheme: light;
+}
+
 :root {
   --font-sf: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "San Francisco", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --ink: #19231d;
